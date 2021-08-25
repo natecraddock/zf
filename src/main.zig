@@ -10,34 +10,29 @@ pub fn main() anyerror!void {
 
     const allocator = &arena.allocator;
 
-    const BUF_SIZE = 4096 * 2 * 2;
-    var capacity: usize = BUF_SIZE;
-    var position: usize = 0;
-    var buf = try allocator.alloc(u8, capacity);
-
-    // read lines on stdin and echo
-    // var stdin = io.bufferedReader(io.getStdIn().reader()).reader();
+    // read lines on stdin
     var stdin = io.getStdIn().reader();
-    while (stdin.readNoEof(buf[position..])) {
-        // read the buf to capacity, make more room
-        capacity += BUF_SIZE;
-        position += BUF_SIZE;
-        buf = try allocator.realloc(buf, capacity);
-    } else |err| {
-        // read until eof, shrink remaining
-    }
+    var buf = ArrayList(u8).init(allocator);
+    defer buf.deinit();
+
+    // read all lines or exit on out of memory
+    try readAllAlloc(&stdin, &buf);
 
     // find delimiters
+    // const delimiter = ' ';
     const delimiter = '\n';
     var strings = ArrayList([]u8).init(allocator);
     defer strings.deinit();
 
     var start: usize = 0;
-    for (buf) |char, index| {
+    for (buf.items) |char, index| {
         if (char == delimiter) {
+            // std.debug.print("found char newline\n", .{});
             // add to arraylist
-            try strings.append(buf[start..index]);
+            try strings.append(buf.items[start..index]);
             start = index + 1;
+        } else {
+            // std.debug.print("found char {c}\n", .{char});
         }
     }
 
@@ -45,5 +40,27 @@ pub fn main() anyerror!void {
     for (strings.items) |string, index| {
         if (index == 10) break;
         std.debug.print("{} {s}\n", .{ index, string });
+    }
+}
+
+// similar to the standard library function, but
+// doesn't restrict the maximum size of the buffer
+fn readAllAlloc(reader: *std.fs.File.Reader, array_list: *ArrayList(u8)) !void {
+    // ensure the array starts at a decent size
+    try array_list.ensureTotalCapacity(4096);
+
+    var index: usize = 0;
+    while (true) {
+        array_list.expandToCapacity();
+        const slice = array_list.items[index..];
+        const read = try reader.readAll(slice);
+        index += read;
+
+        if (read != slice.len) {
+            array_list.shrinkAndFree(read);
+            return;
+        }
+
+        try array_list.ensureTotalCapacity(index + 1);
     }
 }
