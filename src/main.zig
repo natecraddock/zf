@@ -19,7 +19,6 @@ pub fn main() anyerror!void {
     try readAllAlloc(&stdin, &buf);
 
     // find delimiters
-    // const delimiter = ' ';
     const delimiter = '\n';
     var strings = ArrayList([]u8).init(allocator);
     defer strings.deinit();
@@ -27,13 +26,14 @@ pub fn main() anyerror!void {
     var start: usize = 0;
     for (buf.items) |char, index| {
         if (char == delimiter) {
-            // std.debug.print("found char newline\n", .{});
             // add to arraylist
             try strings.append(buf.items[start..index]);
             start = index + 1;
-        } else {
-            // std.debug.print("found char {c}\n", .{char});
         }
+    }
+    // catch the end if stdio didn't end in a delimiter
+    if (start < buf.items.len) {
+        try strings.append(buf.items[start..]);
     }
 
     // print the first ten strings with indexes
