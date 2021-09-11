@@ -67,7 +67,7 @@ fn readAllAlloc(reader: *std.fs.File.Reader, array_list: *ArrayList(u8)) !void {
         index += read;
 
         if (read != slice.len) {
-            array_list.shrinkAndFree(read);
+            array_list.shrinkAndFree(index);
             return;
         }
 
