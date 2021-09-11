@@ -2,6 +2,7 @@ const std = @import("std");
 const heap = std.heap;
 const io = std.io;
 const ArrayList = std.ArrayList;
+const testing = std.testing;
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating and freeing memory during runtime
@@ -18,29 +19,38 @@ pub fn main() anyerror!void {
     // read all lines or exit on out of memory
     try readAllAlloc(&stdin, &buf);
 
-    // find delimiters
     const delimiter = '\n';
-    var strings = ArrayList([]u8).init(allocator);
-    defer strings.deinit();
+    var options = try collectOptions(allocator, buf.items, delimiter);
+    defer options.deinit();
 
+    // print the first ten strings with indexes
+    for (options.items) |string, index| {
+        if (index == 10) break;
+        std.debug.print("{} {s}\n", .{ index, string });
+    }
+}
+
+// read the options from the buffer
+fn collectOptions(allocator: *std.mem.Allocator, buf: []const u8, delimiter: u8) !ArrayList([]const u8) {
+    var options = ArrayList([]const u8).init(allocator);
+
+    // find delimiters
     var start: usize = 0;
-    for (buf.items) |char, index| {
+    for (buf) |char, index| {
         if (char == delimiter) {
-            // add to arraylist
-            try strings.append(buf.items[start..index]);
+            // add to arraylist only if slice is not all delimiters
+            if (index - start != 0) {
+                try options.append(buf[start..index]);
+            }
             start = index + 1;
         }
     }
     // catch the end if stdio didn't end in a delimiter
-    if (start < buf.items.len) {
-        try strings.append(buf.items[start..]);
+    if (start < buf.len) {
+        try options.append(buf[start..]);
     }
 
-    // print the first ten strings with indexes
-    for (strings.items) |string, index| {
-        if (index == 10) break;
-        std.debug.print("{} {s}\n", .{ index, string });
-    }
+    return options;
 }
 
 // similar to the standard library function, but
@@ -63,4 +73,33 @@ fn readAllAlloc(reader: *std.fs.File.Reader, array_list: *ArrayList(u8)) !void {
 
         try array_list.ensureTotalCapacity(index + 1);
     }
+}
+
+test "collect options whitespace" {
+    var options = try collectOptions(std.testing.allocator, "first second third fourth", ' ');
+    defer options.deinit();
+
+    try testing.expectEqual(@as(usize, 4), options.items.len);
+    try testing.expectEqualStrings("first", options.items[0]);
+    try testing.expectEqualStrings("second", options.items[1]);
+    try testing.expectEqualStrings("third", options.items[2]);
+    try testing.expectEqualStrings("fourth", options.items[3]);
+}
+
+test "collect options newline" {
+    var options = try collectOptions(std.testing.allocator, "first\nsecond\nthird\nfourth", '\n');
+    defer options.deinit();
+
+    try testing.expectEqual(@as(usize, 4), options.items.len);
+    try testing.expectEqualStrings("first", options.items[0]);
+    try testing.expectEqualStrings("second", options.items[1]);
+    try testing.expectEqualStrings("third", options.items[2]);
+    try testing.expectEqualStrings("fourth", options.items[3]);
+}
+
+test "collect options whitespace" {
+    var options = try collectOptions(std.testing.allocator, "   first second   third fourth   ", ' ');
+    defer options.deinit();
+
+    try testing.expectEqual(@as(usize, 4), options.items.len);
 }
