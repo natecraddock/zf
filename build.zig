@@ -17,4 +17,14 @@ pub fn build(b: *std.build.Builder) void {
 
     const run_step = b.step("run", "Run zf");
     run_step.dependOn(&run_cmd.step);
+
+    const tests = b.step("test", "Run tests");
+    addTest(b, tests, "src/main.zig");
+    addTest(b, tests, "src/collect.zig");
+    addTest(b, tests, "src/filter.zig");
+}
+
+fn addTest(b: *std.build.Builder, step: *std.build.Step, name: []const u8) void {
+    const t = b.addTest(name);
+    step.dependOn(&t.step);
 }
