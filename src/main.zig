@@ -23,9 +23,16 @@ pub fn main() anyerror!void {
     var options = try collectOptions(allocator, buf.items, delimiter);
     defer options.deinit();
 
+    // TODO: present selection TUI
+
+    // run filter
+    var filtered = try filter(allocator, options.items, "outliner");
+    defer filtered.deinit();
+
+    // output all matches
+
     // print the first ten strings with indexes
-    for (options.items) |string, index| {
-        if (index == 10) break;
+    for (filtered.items) |string, index| {
         std.debug.print("{} {s}\n", .{ index, string });
     }
 }
@@ -73,6 +80,18 @@ fn readAllAlloc(reader: *std.fs.File.Reader, array_list: *ArrayList(u8)) !void {
 
         try array_list.ensureTotalCapacity(index + 1);
     }
+}
+
+fn filter(allocator: *std.mem.Allocator, options: [][]const u8, query: []const u8) !ArrayList([]const u8) {
+    var filtered = ArrayList([]const u8).init(allocator);
+
+    for (options) |option, index| {
+        if (std.mem.count(u8, option, query) > 0) {
+            try filtered.append(option);
+        }
+    }
+
+    return filtered;
 }
 
 test "collect options whitespace" {
