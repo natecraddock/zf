@@ -15,6 +15,8 @@ pub fn main() anyerror!void {
 
     const allocator = &arena.allocator;
 
+    // TODO: read cmd args
+
     // read lines on stdin
     var stdin = io.getStdIn().reader();
     var buf = ArrayList(u8).init(allocator);
