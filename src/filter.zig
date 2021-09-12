@@ -12,3 +12,16 @@ pub fn filter(allocator: *std.mem.Allocator, options: [][]const u8, query: []con
 
     return filtered;
 }
+
+const testing = std.testing;
+
+test "simple filter" {
+    var options = [_][]const u8{ "abc", "xyz", "abcdef" };
+
+    // match all strings containing "abc"
+    var filtered = try filter(testing.allocator, options[0..], "abc");
+    defer filtered.deinit();
+
+    var expected = [_][]const u8{ "abc", "abcdef" };
+    try testing.expectEqualSlices([]const u8, expected[0..], filtered.items);
+}
