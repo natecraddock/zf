@@ -5,12 +5,27 @@ pub fn filter(allocator: *std.mem.Allocator, options: [][]const u8, query: []con
     var filtered = ArrayList([]const u8).init(allocator);
 
     for (options) |option, index| {
-        if (std.mem.count(u8, option, query) > 0) {
+        if (match(option, query)) {
             try filtered.append(option);
         }
     }
 
     return filtered;
+}
+
+fn match(haystack: []const u8, needle: []const u8) bool {
+    if (needle.len > haystack.len) return false;
+    var index: usize = 0;
+    for (haystack) |char| {
+        if (needle[index] == char) {
+            index += 1;
+        }
+
+        // all chars have matched
+        if (index == needle.len) return true;
+    }
+
+    return false;
 }
 
 const testing = std.testing;
