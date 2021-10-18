@@ -7,6 +7,7 @@ const testing = std.testing;
 const collect = @import("collect.zig");
 const filter = @import("filter.zig");
 const util = @import("util.zig");
+const ui = @import("tty.zig");
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating and freeing memory during runtime
@@ -30,15 +31,19 @@ pub fn main() anyerror!void {
     defer options.deinit();
 
     // TODO: present selection TUI
+    var tty = try ui.Tty.init();
+    defer tty.deinit();
+
+    try ui.run(allocator, &tty, options);
 
     // run filter
-    var filtered = try filter.filter(allocator, options.items, "outliner");
-    defer filtered.deinit();
+    // var filtered = try filter.filter(allocator, options.items, query.items);
+    // defer filtered.deinit();
 
     // output all matches
 
+    // for (filtered.items) |string, index| {
     // print the first ten strings with indexes
-    for (filtered.items) |string, index| {
-        std.debug.print("{} {s}\n", .{ index, string });
-    }
+    //     std.debug.print("{} {s}\n", .{ index, string });
+    // }
 }

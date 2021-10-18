@@ -5,7 +5,7 @@ pub fn filter(allocator: *std.mem.Allocator, options: [][]const u8, query: []con
     var filtered = ArrayList([]const u8).init(allocator);
 
     for (options) |option, index| {
-        if (match(option, query)) {
+        if (query.len == 0 or match(option, query)) {
             try filtered.append(option);
         }
     }
