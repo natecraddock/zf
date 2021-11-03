@@ -17,9 +17,8 @@ pub const Tty = struct {
         var termios = try std.os.tcgetattr(tty.handle);
         var raw_termios = termios;
 
-        raw_termios.iflag &= ~@as(u32, bits.ICRNL | bits.IXON);
-        raw_termios.lflag &= ~@as(u32, bits.ICANON | bits.ECHO | bits.IEXTEN);
-        raw_termios.oflag &= ~@as(u32, bits.OPOST);
+        raw_termios.iflag &= ~@as(u32, bits.ICRNL);
+        raw_termios.lflag &= ~@as(u32, bits.ICANON | bits.ECHO);
         raw_termios.cc[bits.VMIN] = 0;
         raw_termios.cc[bits.VTIME] = 1;
 
@@ -107,11 +106,8 @@ fn readKey(file: std.fs.File) Key {
 }
 
 fn draw(tty: *Tty, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
-    tty.cursorVisible(false);
+    // tty.cursorVisible(false);
     tty.clearLine();
-
-    // draw the prompt
-    try std.fmt.format(tty.tty.writer(), "> {s}\r", .{query.items});
 
     // draw the options
     const lines = 10;
@@ -128,7 +124,14 @@ fn draw(tty: *Tty, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
         tty.lineUp();
     }
 
-    tty.cursorVisible(true);
+    // draw the prompt
+    _ = try tty.tty.writer().write("> ");
+    _ = try tty.tty.writer().write(query.items);
+    // try std.fmt.format(tty.tty.writer(), "> {s}\r", .{query.items});
+
+    // tty.setCursor(1, 1);
+
+    // tty.cursorVisible(true);
 }
 
 pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !void {
