@@ -108,8 +108,8 @@ fn readKey(file: std.fs.File) Key {
         else => {},
     }
 
-    // regular chars
-    if (std.ascii.isPrint(byte)) return .{ .character = byte };
+    // ascii chars
+    if (std.ascii.isPrint(byte) or std.ascii.isCntrl(byte)) return .{ .character = byte };
 
     return .none;
 }
@@ -160,6 +160,10 @@ fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]con
     tty.cursorVisible(true);
 }
 
+fn ctrl(comptime key: u8) u8 {
+    return key & 0x1f;
+}
+
 pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !void {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
@@ -188,9 +192,22 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
         var key = readKey(tty.tty);
         switch (key) {
             .character => |byte| {
-                if (byte == 'q') break;
-                try query.insert(state.cursor, byte);
-                state.cursor += 1;
+                switch (byte) {
+                    ctrl('u') => {
+                        state.cursor = 0;
+                        query.clearAndFree();
+                    },
+                    ctrl('p') => if (state.selected > 0) {
+                        state.selected -= 1;
+                    },
+                    ctrl('n') => if (state.selected < numRows - 1) {
+                        state.selected += 1;
+                    },
+                    else => {
+                        try query.insert(state.cursor, byte);
+                        state.cursor += 1;
+                    },
+                }
             },
             .backspace => {
                 if (query.items.len > 0 and state.cursor == query.items.len) {
