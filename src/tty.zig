@@ -71,6 +71,7 @@ const Key = union(enum) {
     left,
     right,
     backspace,
+    delete,
     enter,
     none,
 };
@@ -86,11 +87,14 @@ fn readKey(file: std.fs.File) Key {
         seq[1] = file.reader().readByte() catch return .esc;
 
         if (seq[0] == '[') {
+            _ = file.reader().readByte() catch 0;
+
             return switch (seq[1]) {
                 'A' => .up,
                 'B' => .down,
                 'C' => .right,
                 'D' => .left,
+                '3' => .delete,
                 else => .esc,
             };
         }
@@ -189,8 +193,16 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
                 state.cursor += 1;
             },
             .backspace => {
-                if (query.items.len > 0) {
+                if (query.items.len > 0 and state.cursor == query.items.len) {
+                    _ = query.pop();
                     state.cursor -= 1;
+                } else if (query.items.len > 0 and state.cursor > 0) {
+                    _ = query.orderedRemove(state.cursor);
+                    state.cursor -= 1;
+                }
+            },
+            .delete => {
+                if (query.items.len > 0 and state.cursor < query.items.len) {
                     _ = query.orderedRemove(state.cursor);
                 }
             },
