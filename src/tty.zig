@@ -114,11 +114,12 @@ fn readKey(file: std.fs.File) Key {
 const numRows: usize = 10;
 
 const State = struct {
+    cursor: usize,
     selected: usize,
 };
 
 fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
-    // tty.cursorVisible(false);
+    tty.cursorVisible(false);
     tty.clearLine();
 
     // draw the options
@@ -143,20 +144,26 @@ fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]con
     }
 
     // draw the prompt
+    try std.fmt.format(tty.tty.writer(), "> {s}\r", .{query.items});
+
+    // move cursor by drawing chars
     _ = try tty.tty.writer().write("> ");
-    _ = try tty.tty.writer().write(query.items);
-    // try std.fmt.format(tty.tty.writer(), "> {s}\r", .{query.items});
+    for (query.items) |c, index| {
+        if (index == state.cursor) break;
+        _ = try tty.tty.writer().writeByte(c);
+    }
 
-    // tty.setCursor(1, 1);
-
-    // tty.cursorVisible(true);
+    tty.cursorVisible(true);
 }
 
 pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !void {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
-    var state = State{ .selected = 0 };
+    var state = State{
+        .cursor = 0,
+        .selected = 0,
+    };
 
     // ensure enough room to draw all `numRows` lines of output
     {
@@ -178,11 +185,13 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
         switch (key) {
             .character => |byte| {
                 if (byte == 'q') break;
-                try query.append(byte);
+                try query.insert(state.cursor, byte);
+                state.cursor += 1;
             },
             .backspace => {
                 if (query.items.len > 0) {
-                    _ = query.pop();
+                    state.cursor -= 1;
+                    _ = query.orderedRemove(state.cursor);
                 }
             },
             .up => if (state.selected > 0) {
@@ -191,8 +200,12 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
             .down => if (state.selected < numRows - 1) {
                 state.selected += 1;
             },
-            .left => {},
-            .right => {},
+            .left => if (state.cursor > 0) {
+                state.cursor -= 1;
+            },
+            .right => if (state.cursor < query.items.len) {
+                state.cursor += 1;
+            },
             .enter => break,
             .esc => break,
             .none => {},
