@@ -164,7 +164,7 @@ fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
-pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !void {
+pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -235,9 +235,31 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
             .right => if (state.cursor < query.items.len) {
                 state.cursor += 1;
             },
-            .enter => break,
+            .enter => {
+                if (filtered.items.len == 0) break;
+
+                var selected = ArrayList(u8).init(allocator);
+                try selected.appendSlice(filtered.items[state.selected]);
+                return selected;
+            },
             .esc => break,
             .none => {},
         }
+    }
+
+    return null;
+}
+
+pub fn cleanUp(tty: *Tty) !void {
+    // offset to handle prompt line
+    const lines = numRows + 1;
+    var i: usize = 0;
+    while (i < lines) : (i += 1) {
+        tty.clearLine();
+        tty.lineDown();
+    }
+    i = 0;
+    while (i < lines) : (i += 1) {
+        tty.lineUp();
     }
 }

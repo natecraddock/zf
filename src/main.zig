@@ -34,16 +34,11 @@ pub fn main() anyerror!void {
     var tty = try ui.Tty.init();
     defer tty.deinit();
 
-    try ui.run(allocator, &tty, options);
-
-    // run filter
-    // var filtered = try filter.filter(allocator, options.items, query.items);
-    // defer filtered.deinit();
-
-    // output all matches
-
-    // for (filtered.items) |string, index| {
-    // print the first ten strings with indexes
-    //     std.debug.print("{} {s}\n", .{ index, string });
-    // }
+    var selected = try ui.run(allocator, &tty, options);
+    try ui.cleanUp(&tty);
+    if (selected) |res| {
+        defer res.deinit();
+        const stdout = std.io.getStdOut().writer();
+        try stdout.print("{s}\n", .{res.items});
+    }
 }
