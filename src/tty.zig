@@ -56,6 +56,11 @@ pub const Tty = struct {
             self.write(.{ 25, 'l' });
         }
     }
+
+    pub fn sgr(self: *Tty, code: usize) void {
+        self.write(.{ code, 'm' });
+    }
+
 };
 
 const Key = union(enum) {
@@ -105,20 +110,33 @@ fn readKey(file: std.fs.File) Key {
     return .none;
 }
 
-fn draw(tty: *Tty, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
+// the number of rows of output
+const numRows: usize = 10;
+
+const State = struct {
+    selected: usize,
+};
+
+fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
     // tty.cursorVisible(false);
     tty.clearLine();
 
     // draw the options
-    const lines = 10;
+    const lines = numRows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
         tty.lineDown();
         tty.clearLine();
+        if (i == state.selected) {
+            tty.sgr(7);
+        } else {
+            tty.sgr(0);
+        }
         if (i < options.items.len) {
             try std.fmt.format(tty.tty.writer(), "{s}\r", .{options.items[i]});
         }
     }
+    tty.sgr(0);
     i = 0;
     while (i < lines) : (i += 1) {
         tty.lineUp();
@@ -138,11 +156,23 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
+    var state = State{ .selected = 0 };
+
+    // ensure enough room to draw all `numRows` lines of output
+    {
+        var i: usize = 0;
+        while (i < numRows) : (i += 1) {
+            _ = try tty.tty.writer().write("\n");
+        }
+        i = 0;
+        while (i < numRows) : (i += 1) tty.lineUp();
+    }
+
     while (true) {
         var filtered = try filter.filter(allocator, options.items, query.items);
         defer filtered.deinit();
 
-        try draw(tty, query, filtered);
+        try draw(tty, &state, query, filtered);
 
         var key = readKey(tty.tty);
         switch (key) {
@@ -155,8 +185,12 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
                     _ = query.pop();
                 }
             },
-            .up => {},
-            .down => {},
+            .up => if (state.selected > 0) {
+                state.selected -= 1;
+            },
+            .down => if (state.selected < numRows - 1) {
+                state.selected += 1;
+            },
             .left => {},
             .right => {},
             .enter => break,
