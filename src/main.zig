@@ -30,12 +30,12 @@ pub fn main() anyerror!void {
     var options = try collect.collectOptions(allocator, buf.items, delimiter);
     defer options.deinit();
 
-    // TODO: present selection TUI
     var tty = try ui.Tty.init();
-    defer tty.deinit();
 
     var selected = try ui.run(allocator, &tty, options);
     try ui.cleanUp(&tty);
+    tty.deinit();
+
     if (selected) |res| {
         defer res.deinit();
         const stdout = std.io.getStdOut().writer();
