@@ -140,6 +140,7 @@ fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]con
         if (i < options.items.len) {
             try std.fmt.format(tty.tty.writer(), "{s}\r", .{options.items[i]});
         }
+        if (i == state.selected) tty.sgr(0);
     }
     tty.sgr(0);
     i = 0;
