@@ -190,6 +190,8 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
 
         try draw(tty, &state, query, filtered);
 
+        const visible_rows = std.math.min(numRows, filtered.items.len);
+
         var key = readKey(tty.tty);
         switch (key) {
             .character => |byte| {
@@ -201,7 +203,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
                     ctrl('p') => if (state.selected > 0) {
                         state.selected -= 1;
                     },
-                    ctrl('n') => if (state.selected < numRows - 1) {
+                    ctrl('n') => if (state.selected < visible_rows - 1) {
                         state.selected += 1;
                     },
                     else => {
@@ -227,7 +229,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
             .up => if (state.selected > 0) {
                 state.selected -= 1;
             },
-            .down => if (state.selected < numRows - 1) {
+            .down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
             },
             .left => if (state.cursor > 0) {
