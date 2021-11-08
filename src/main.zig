@@ -3,7 +3,6 @@ const heap = std.heap;
 const io = std.io;
 const ArrayList = std.ArrayList;
 
-const collect = @import("collect.zig");
 const filter = @import("filter.zig");
 const util = @import("util.zig");
 const ui = @import("tty.zig");
@@ -26,12 +25,12 @@ pub fn main() anyerror!void {
     try util.readAll(&stdin, &buf);
 
     const delimiter = '\n';
-    var options = try collect.collectOptions(allocator, buf.items, delimiter);
-    defer options.deinit();
+    var candidates = try filter.collectCandidates(allocator, buf.items, delimiter);
+    defer candidates.deinit();
 
     var tty = try ui.Tty.init();
 
-    var selected = try ui.run(allocator, &tty, options);
+    var selected = try ui.run(allocator, &tty, candidates);
     try ui.cleanUp(&tty);
     tty.deinit();
 
@@ -43,7 +42,6 @@ pub fn main() anyerror!void {
 }
 
 test {
-    _ = @import("collect.zig");
     _ = @import("filter.zig");
     _ = @import("util.zig");
 }

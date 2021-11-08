@@ -122,11 +122,11 @@ const State = struct {
     selected: usize,
 };
 
-fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]const u8)) !void {
+fn draw(tty: *Tty, state: *State, query: ArrayList(u8), candidates: ArrayList(filter.Candidate)) !void {
     tty.cursorVisible(false);
     tty.clearLine();
 
-    // draw the options
+    // draw the candidates
     const lines = numRows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
@@ -137,8 +137,8 @@ fn draw(tty: *Tty, state: *State, query: ArrayList(u8), options: ArrayList([]con
         } else {
             tty.sgr(0);
         }
-        if (i < options.items.len) {
-            try std.fmt.format(tty.tty.writer(), "{s}\r", .{options.items[i]});
+        if (i < candidates.items.len) {
+            try std.fmt.format(tty.tty.writer(), "{s}\r", .{candidates.items[i].str});
         }
         if (i == state.selected) tty.sgr(0);
     }
@@ -165,7 +165,7 @@ fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
-pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const u8)) !?ArrayList(u8) {
+pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -185,7 +185,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
     }
 
     while (true) {
-        var filtered = try filter.filter(allocator, options.items, query.items);
+        var filtered = try filter.filter(allocator, candidates.items, query.items);
         defer filtered.deinit();
 
         try draw(tty, &state, query, filtered);
@@ -242,7 +242,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, options: ArrayList([]const 
                 if (filtered.items.len == 0) break;
 
                 var selected = ArrayList(u8).init(allocator);
-                try selected.appendSlice(filtered.items[state.selected]);
+                try selected.appendSlice(filtered.items[state.selected].str);
                 return selected;
             },
             .esc => break,
