@@ -53,4 +53,8 @@ test "collect options whitespace" {
     defer options.deinit();
 
     try testing.expectEqual(@as(usize, 4), options.items.len);
+    try testing.expectEqualStrings("first", options.items[0]);
+    try testing.expectEqualStrings("second", options.items[1]);
+    try testing.expectEqualStrings("third", options.items[2]);
+    try testing.expectEqualStrings("fourth", options.items[3]);
 }

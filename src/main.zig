@@ -2,7 +2,6 @@ const std = @import("std");
 const heap = std.heap;
 const io = std.io;
 const ArrayList = std.ArrayList;
-const testing = std.testing;
 
 const collect = @import("collect.zig");
 const filter = @import("filter.zig");
@@ -41,4 +40,10 @@ pub fn main() anyerror!void {
         const stdout = std.io.getStdOut().writer();
         try stdout.print("{s}\n", .{res.items});
     }
+}
+
+test {
+    _ = @import("collect.zig");
+    _ = @import("filter.zig");
+    _ = @import("util.zig");
 }
