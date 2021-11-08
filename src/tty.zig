@@ -262,7 +262,7 @@ pub fn cleanUp(tty: *Tty) !void {
         tty.lineDown();
     }
     i = 0;
-    while (i < lines - 1) : (i += 1) {
+    while (i < lines) : (i += 1) {
         tty.lineUp();
     }
 }
