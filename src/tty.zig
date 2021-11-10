@@ -65,6 +65,7 @@ pub const Tty = struct {
 
 const Key = union(enum) {
     character: u8,
+    control: u8,
     esc,
     up,
     down,
@@ -108,8 +109,11 @@ fn readKey(file: std.fs.File) Key {
         else => {},
     }
 
+    // control chars
+    if (std.ascii.isCntrl(byte)) return .{ .control = byte };
+
     // ascii chars
-    if (std.ascii.isPrint(byte) or std.ascii.isCntrl(byte)) return .{ .character = byte };
+    if (std.ascii.isPrint(byte)) return .{ .character = byte };
 
     return .none;
 }
@@ -195,6 +199,10 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filte
         var key = readKey(tty.tty);
         switch (key) {
             .character => |byte| {
+                try query.insert(state.cursor, byte);
+                state.cursor += 1;
+            },
+            .control => |byte| {
                 switch (byte) {
                     ctrl('u') => {
                         state.cursor = 0;
@@ -206,10 +214,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filte
                     ctrl('n') => if (state.selected < visible_rows - 1) {
                         state.selected += 1;
                     },
-                    else => {
-                        try query.insert(state.cursor, byte);
-                        state.cursor += 1;
-                    },
+                    else => {},
                 }
             },
             .backspace => {
