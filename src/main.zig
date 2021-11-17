@@ -5,7 +5,7 @@ const ArrayList = std.ArrayList;
 
 const filter = @import("filter.zig");
 const util = @import("util.zig");
-const ui = @import("tty.zig");
+const ui = @import("ui.zig");
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating and freeing memory during runtime
@@ -28,11 +28,11 @@ pub fn main() anyerror!void {
     var candidates = try filter.collectCandidates(allocator, buf.items, delimiter);
     defer candidates.deinit();
 
-    var tty = try ui.Tty.init();
+    var terminal = try ui.Terminal.init();
 
-    var selected = try ui.run(allocator, &tty, candidates);
-    try ui.cleanUp(&tty);
-    tty.deinit();
+    var selected = try ui.run(allocator, &terminal, candidates);
+    try ui.cleanUp(&terminal);
+    terminal.deinit();
 
     if (selected) |res| {
         defer res.deinit();

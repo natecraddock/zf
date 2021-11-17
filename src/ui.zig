@@ -5,12 +5,12 @@ const File = std.fs.File;
 
 const filter = @import("filter.zig");
 
-pub const Tty = struct {
+pub const Terminal = struct {
     tty: File,
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
-    pub fn init() !Tty {
+    pub fn init() !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .read = true, .write = true });
 
         // store original terminal settings to restore later
@@ -24,32 +24,32 @@ pub const Tty = struct {
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
-        return Tty{ .tty = tty, .termios = termios, .raw_termios = raw_termios };
+        return Terminal{ .tty = tty, .termios = termios, .raw_termios = raw_termios };
     }
 
-    pub fn deinit(self: *Tty) void {
+    pub fn deinit(self: *Terminal) void {
         std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch {};
         self.tty.close();
     }
 
-    fn write(self: *Tty, args: anytype) void {
+    fn write(self: *Terminal, args: anytype) void {
         std.fmt.format(self.tty.writer(), "\x1b[{d}{c}", args) catch unreachable;
     }
 
-    pub fn clearLine(self: *Tty) void {
+    pub fn clearLine(self: *Terminal) void {
         self.write(.{ 0, 'G' });
         self.write(.{ 2, 'K' });
     }
 
-    pub fn lineUp(self: *Tty) void {
+    pub fn lineUp(self: *Terminal) void {
         self.write(.{ 1, 'A' });
     }
 
-    pub fn lineDown(self: *Tty) void {
+    pub fn lineDown(self: *Terminal) void {
         self.write(.{ 1, 'B' });
     }
 
-    pub fn cursorVisible(self: *Tty, show: bool) void {
+    pub fn cursorVisible(self: *Terminal, show: bool) void {
         if (show) {
             self.write(.{ 25, 'h' });
         } else {
@@ -57,7 +57,7 @@ pub const Tty = struct {
         }
     }
 
-    pub fn sgr(self: *Tty, code: usize) void {
+    pub fn sgr(self: *Terminal, code: usize) void {
         self.write(.{ code, 'm' });
     }
 
@@ -66,7 +66,7 @@ pub const Tty = struct {
         y: usize,
     };
 
-    pub fn windowSize(self: *Tty) ?WinSize {
+    pub fn windowSize(self: *Terminal) ?WinSize {
         var size: std.c.winsize = undefined;
 
         if (std.c.ioctl(self.tty.handle, std.os.TIOCGWINSZ, &size) == -1) {
@@ -140,53 +140,53 @@ const State = struct {
     selected: usize,
 };
 
-fn draw(tty: *Tty, state: *State, query: ArrayList(u8), candidates: ArrayList(filter.Candidate)) !void {
-    const win_size = tty.windowSize();
+fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: ArrayList(filter.Candidate)) !void {
+    const win_size = terminal.windowSize();
 
-    tty.cursorVisible(false);
-    tty.clearLine();
+    terminal.cursorVisible(false);
+    terminal.clearLine();
 
     // draw the candidates
     const lines = numRows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
-        tty.lineDown();
-        tty.clearLine();
+        terminal.lineDown();
+        terminal.clearLine();
         if (i == state.selected) {
-            tty.sgr(7);
+            terminal.sgr(7);
         } else {
-            tty.sgr(0);
+            terminal.sgr(0);
         }
         if (i < candidates.items.len) {
             var str = candidates.items[i].str[0..std.math.min(win_size.?.x, candidates.items[i].str.len)];
-            try std.fmt.format(tty.tty.writer(), "{s}\r", .{str});
+            try std.fmt.format(terminal.tty.writer(), "{s}\r", .{str});
         }
-        if (i == state.selected) tty.sgr(0);
+        if (i == state.selected) terminal.sgr(0);
     }
-    tty.sgr(0);
+    terminal.sgr(0);
     i = 0;
     while (i < lines) : (i += 1) {
-        tty.lineUp();
+        terminal.lineUp();
     }
 
     // draw the prompt
-    try std.fmt.format(tty.tty.writer(), "> {s}\r", .{query.items});
+    try std.fmt.format(terminal.tty.writer(), "> {s}\r", .{query.items});
 
     // move cursor by drawing chars
-    _ = try tty.tty.writer().write("> ");
+    _ = try terminal.tty.writer().write("> ");
     for (query.items) |c, index| {
         if (index == state.cursor) break;
-        _ = try tty.tty.writer().writeByte(c);
+        _ = try terminal.tty.writer().writeByte(c);
     }
 
-    tty.cursorVisible(true);
+    terminal.cursorVisible(true);
 }
 
 fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
-pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
+pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -199,21 +199,23 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filte
     {
         var i: usize = 0;
         while (i < numRows) : (i += 1) {
-            _ = try tty.tty.writer().write("\n");
+            _ = try terminal.tty.writer().write("\n");
         }
         i = 0;
-        while (i < numRows) : (i += 1) tty.lineUp();
+        while (i < numRows) : (i += 1) terminal.lineUp();
     }
 
     while (true) {
         var filtered = try filter.filter(allocator, candidates.items, query.items);
         defer filtered.deinit();
 
-        try draw(tty, &state, query, filtered);
+        // var sorted = std.sort.sort(filter.Candidate, candidates.items, {}, filter.sort);
+
+        try draw(terminal, &state, query, filtered);
 
         const visible_rows = std.math.min(numRows, filtered.items.len);
 
-        var key = readKey(tty.tty);
+        var key = readKey(terminal.tty);
         switch (key) {
             .character => |byte| {
                 try query.insert(state.cursor, byte);
@@ -275,16 +277,16 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filte
     return null;
 }
 
-pub fn cleanUp(tty: *Tty) !void {
+pub fn cleanUp(terminal: *Terminal) !void {
     // offset to handle prompt line
     const lines = numRows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
-        tty.clearLine();
-        tty.lineDown();
+        terminal.clearLine();
+        terminal.lineDown();
     }
     i = 0;
     while (i < lines) : (i += 1) {
-        tty.lineUp();
+        terminal.lineUp();
     }
 }
