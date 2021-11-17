@@ -61,6 +61,20 @@ pub const Tty = struct {
         self.write(.{ code, 'm' });
     }
 
+    const WinSize = struct {
+        x: usize,
+        y: usize,
+    };
+
+    pub fn windowSize(self: *Tty) ?WinSize {
+        var size: std.c.winsize = undefined;
+
+        if (std.c.ioctl(self.tty.handle, std.os.TIOCGWINSZ, &size) == -1) {
+            return null;
+        }
+
+        return WinSize{ .x = size.ws_col, .y = size.ws_row };
+    }
 };
 
 const Key = union(enum) {
@@ -127,6 +141,8 @@ const State = struct {
 };
 
 fn draw(tty: *Tty, state: *State, query: ArrayList(u8), candidates: ArrayList(filter.Candidate)) !void {
+    const win_size = tty.windowSize();
+
     tty.cursorVisible(false);
     tty.clearLine();
 
@@ -142,7 +158,8 @@ fn draw(tty: *Tty, state: *State, query: ArrayList(u8), candidates: ArrayList(fi
             tty.sgr(0);
         }
         if (i < candidates.items.len) {
-            try std.fmt.format(tty.tty.writer(), "{s}\r", .{candidates.items[i].str});
+            var str = candidates.items[i].str[0..std.math.min(win_size.?.x, candidates.items[i].str.len)];
+            try std.fmt.format(tty.tty.writer(), "{s}\r", .{str});
         }
         if (i == state.selected) tty.sgr(0);
     }
