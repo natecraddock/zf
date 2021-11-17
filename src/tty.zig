@@ -277,7 +277,7 @@ pub fn run(allocator: *std.mem.Allocator, tty: *Tty, candidates: ArrayList(filte
 
 pub fn cleanUp(tty: *Tty) !void {
     // offset to handle prompt line
-    const lines = numRows + 1;
+    const lines = numRows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
         tty.clearLine();
