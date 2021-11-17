@@ -205,13 +205,15 @@ pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: Array
         while (i < numRows) : (i += 1) terminal.lineUp();
     }
 
+    var should_draw = true;
     while (true) {
         var filtered = try filter.filter(allocator, candidates.items, query.items);
         defer filtered.deinit();
 
         // var sorted = std.sort.sort(filter.Candidate, candidates.items, {}, filter.sort);
 
-        try draw(terminal, &state, query, filtered);
+        if (should_draw) try draw(terminal, &state, query, filtered);
+        should_draw = false;
 
         const visible_rows = std.math.min(numRows, filtered.items.len);
 
@@ -220,18 +222,22 @@ pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: Array
             .character => |byte| {
                 try query.insert(state.cursor, byte);
                 state.cursor += 1;
+                should_draw = true;
             },
             .control => |byte| {
                 switch (byte) {
                     ctrl('u') => {
                         state.cursor = 0;
                         query.clearAndFree();
+                        should_draw = true;
                     },
                     ctrl('p') => if (state.selected > 0) {
                         state.selected -= 1;
+                        should_draw = true;
                     },
                     ctrl('n') => if (state.selected < visible_rows - 1) {
                         state.selected += 1;
+                        should_draw = true;
                     },
                     else => {},
                 }
@@ -240,27 +246,34 @@ pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: Array
                 if (query.items.len > 0 and state.cursor == query.items.len) {
                     _ = query.pop();
                     state.cursor -= 1;
+                    should_draw = true;
                 } else if (query.items.len > 0 and state.cursor > 0) {
                     _ = query.orderedRemove(state.cursor);
                     state.cursor -= 1;
+                    should_draw = true;
                 }
             },
             .delete => {
                 if (query.items.len > 0 and state.cursor < query.items.len) {
                     _ = query.orderedRemove(state.cursor);
+                    should_draw = true;
                 }
             },
             .up => if (state.selected > 0) {
                 state.selected -= 1;
+                should_draw = true;
             },
             .down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
+                should_draw = true;
             },
             .left => if (state.cursor > 0) {
                 state.cursor -= 1;
+                should_draw = true;
             },
             .right => if (state.cursor < query.items.len) {
                 state.cursor += 1;
+                should_draw = true;
             },
             .enter => {
                 if (filtered.items.len == 0) break;
