@@ -69,6 +69,8 @@ pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimit
         }
     }
 
+    std.sort.sort(Candidate, candidates.items, {}, sort);
+
     return candidates;
 }
 
@@ -111,31 +113,81 @@ test "collectCandidates excess whitespace" {
 pub fn filter(allocator: *std.mem.Allocator, candidates: []Candidate, query: []const u8) !ArrayList(Candidate) {
     var filtered = ArrayList(Candidate).init(allocator);
 
-    for (candidates) |candidate, index| {
-        if (query.len == 0 or match(candidate.str, query)) {
+    if (query.len == 0) {
+        for (candidates) |candidate| {
             try filtered.append(candidate);
+        }
+        return filtered;
+    }
+
+    const filename_match = true;
+    if (filename_match) {
+        for (candidates) |*candidate| {
+            score(candidate, query, true);
+            if (candidate.score > 0) try filtered.append(candidate.*);
+        }
+    } else {
+        for (candidates) |*candidate| {
+            score(candidate, query, false);
+            if (candidate.score > 0) try filtered.append(candidate.*);
         }
     }
 
     return filtered;
 }
 
-fn match(haystack: []const u8, needle: []const u8) bool {
-    if (needle.len > haystack.len) return false;
-    var index: usize = 0;
-    for (haystack) |char| {
-        if (needle[index] == char) {
-            index += 1;
+/// search for needle in haystack and return length of matching substring
+/// returns null if there is no match
+fn fuzzyMatch(haystack: []const u8, needle: []const u8) ?usize {
+    if (needle.len > haystack.len) return null;
+
+    var start: ?usize = null;
+    var matches: usize = 0;
+    for (haystack) |char, i| {
+        if (needle[matches] == char) {
+            if (start == null) start = i;
+            matches += 1;
         }
 
         // all chars have matched
-        if (index == needle.len) return true;
+        if (matches == needle.len) return i - start.? + 1;
     }
 
-    return false;
+    return null;
 }
 
-const testing = std.testing;
+test "fuzzy match" {
+    try testing.expect(fuzzyMatch("abcdefg", "z") == null);
+    try testing.expect(fuzzyMatch("a", "xyz") == null);
+    try testing.expect(fuzzyMatch("xy", "xyz") == null);
+
+    try testing.expect(fuzzyMatch("abc", "a").? == 1);
+    try testing.expect(fuzzyMatch("abc", "abc").? == 3);
+    try testing.expect(fuzzyMatch("abc", "ac").? == 3);
+    try testing.expect(fuzzyMatch("main.zig", "mi").? == 3);
+    try testing.expect(fuzzyMatch("main.zig", "miz").? == 6);
+    try testing.expect(fuzzyMatch("main.zig", "mzig").? == 8);
+    try testing.expect(fuzzyMatch("main.zig", "zig").? == 3);
+}
+
+/// rate how closely the query matches the candidate
+fn score(candidate: *Candidate, query: []const u8, comptime filepath: bool) void {
+    candidate.score = 0;
+
+    if (filepath) {
+        if (fuzzyMatch(candidate.name.?, query)) |s| {
+            candidate.score = 1;
+            return;
+        }
+    }
+
+    if (query.len > candidate.str.len) return;
+
+    if (fuzzyMatch(candidate.str, query)) |s| {
+        candidate.score = s;
+        return;
+    }
+}
 
 test "simple filter" {
     // var candidates = [_][]const u8{ "abc", "xyz", "abcdef" };
@@ -146,4 +198,10 @@ test "simple filter" {
 
     // var expected = [_][]const u8{ "abc", "abcdef" };
     // try testing.expectEqualSlices([]const u8, expected[0..], filtered.items);
+}
+
+pub fn sort(_: void, a: Candidate, b: Candidate) bool {
+    if (a.score < b.score) return true;
+    if (a.str.len < b.str.len) return true;
+    return false;
 }
