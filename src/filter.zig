@@ -5,9 +5,14 @@ const testing = std.testing;
 /// Candidates are the strings read from stdin
 /// if the filepath matching algorithm is used, then name will be
 /// used to store the filename of the path in str.
+///
+/// lowercase versions of the full path and of the name are stored
+/// for smart case matching
 pub const Candidate = struct {
     str: []const u8,
+    str_lower: []const u8,
     name: ?[]const u8 = null,
+    name_lower: ?[]const u8 = null,
     score: usize = 0,
 };
 
@@ -38,6 +43,12 @@ test "is path" {
     try testing.expect(!isPath("Makefile"));
 }
 
+fn toLower(str: []u8) void {
+    for (str) |*c| {
+        c.* = std.ascii.toLower(c.*);
+    }
+}
+
 /// read the candidates from the buffer
 pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimiter: u8) !ArrayList(Candidate) {
     var candidates = ArrayList(Candidate).init(allocator);
@@ -48,7 +59,11 @@ pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimit
         if (char == delimiter) {
             // add to arraylist only if slice is not all delimiters
             if (index - start != 0) {
-                try candidates.append(.{ .str = buf[start..index] });
+                var lower = try allocator.alloc(u8, index - start);
+                std.mem.copy(u8, lower, buf[start..index]);
+                toLower(lower);
+
+                try candidates.append(.{ .str = buf[start..index], .str_lower = lower });
             }
             start = index + 1;
         }
@@ -56,7 +71,11 @@ pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimit
 
     // catch the end if stdio didn't end in a delimiter
     if (start < buf.len) {
-        try candidates.append(.{ .str = buf[start..] });
+        var lower = try allocator.alloc(u8, buf.len - start);
+        std.mem.copy(u8, lower, buf[start..]);
+        toLower(lower);
+
+        try candidates.append(.{ .str = buf[start..], .str_lower = lower });
     }
 
     // determine if these candidates are filepaths
@@ -66,6 +85,7 @@ pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimit
     if (filename_match) {
         for (candidates.items) |*candidate| {
             candidate.name = std.fs.path.basename(candidate.str);
+            candidate.name_lower = std.fs.path.basename(candidate.str_lower);
         }
     }
 
@@ -110,8 +130,16 @@ test "collectCandidates excess whitespace" {
     try testing.expectEqualStrings("fourth", items[3].str);
 }
 
+fn hasUpper(query: []const u8) bool {
+    for (query) |*c| {
+        if (std.ascii.isUpper(c.*)) return true;
+    }
+    return false;
+}
+
 pub fn filter(allocator: *std.mem.Allocator, candidates: []Candidate, query: []const u8) !ArrayList(Candidate) {
     var filtered = ArrayList(Candidate).init(allocator);
+    const match_case = hasUpper(query);
 
     if (query.len == 0) {
         for (candidates) |candidate| {
@@ -120,17 +148,20 @@ pub fn filter(allocator: *std.mem.Allocator, candidates: []Candidate, query: []c
         return filtered;
     }
 
-    const filename_match = true;
-    if (filename_match) {
-        for (candidates) |*candidate| {
-            score(candidate, query, true);
-            if (candidate.score > 0) try filtered.append(candidate.*);
+    for (candidates) |*candidate| {
+        var str: []const u8 = undefined;
+        var name: ?[]const u8 = undefined;
+
+        if (match_case) {
+            str = candidate.str;
+            name = candidate.name;
+        } else {
+            str = candidate.str_lower;
+            name = candidate.name_lower;
         }
-    } else {
-        for (candidates) |*candidate| {
-            score(candidate, query, false);
-            if (candidate.score > 0) try filtered.append(candidate.*);
-        }
+
+        candidate.score = score(str, name, query, true);
+        if (candidate.score > 0) try filtered.append(candidate.*);
     }
 
     return filtered;
@@ -171,22 +202,20 @@ test "fuzzy match" {
 }
 
 /// rate how closely the query matches the candidate
-fn score(candidate: *Candidate, query: []const u8, comptime filepath: bool) void {
-    candidate.score = 0;
-
+fn score(str: []const u8, name: ?[]const u8, query: []const u8, filepath: bool) usize {
     if (filepath) {
-        if (fuzzyMatch(candidate.name.?, query)) |s| {
-            candidate.score = 1;
-            return;
+        if (fuzzyMatch(name.?, query)) |s| {
+            return 1;
         }
     }
 
-    if (query.len > candidate.str.len) return;
+    if (query.len > str.len) return 0;
 
-    if (fuzzyMatch(candidate.str, query)) |s| {
-        candidate.score = s;
-        return;
+    if (fuzzyMatch(str, query)) |s| {
+        return s;
     }
+
+    return 0;
 }
 
 test "simple filter" {
