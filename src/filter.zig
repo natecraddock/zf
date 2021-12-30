@@ -50,7 +50,7 @@ fn toLower(str: []u8) void {
 }
 
 /// read the candidates from the buffer
-pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimiter: u8) !ArrayList(Candidate) {
+pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) !ArrayList(Candidate) {
     var candidates = ArrayList(Candidate).init(allocator);
 
     // find delimiters
@@ -79,8 +79,9 @@ pub fn collectCandidates(allocator: *std.mem.Allocator, buf: []const u8, delimit
     }
 
     // determine if these candidates are filepaths
-    const end = candidates.items.len - 1;
-    const filename_match = isPath(candidates.items[0].str) or isPath(candidates.items[end].str) or isPath(candidates.items[end / 2].str);
+    // const end = candidates.items.len - 1;
+    // const filename_match = isPath(candidates.items[0].str) or isPath(candidates.items[end].str) or isPath(candidates.items[end / 2].str);
+    const filename_match = true;
 
     if (filename_match) {
         for (candidates.items) |*candidate| {
@@ -137,7 +138,7 @@ fn hasUpper(query: []const u8) bool {
     return false;
 }
 
-pub fn filter(allocator: *std.mem.Allocator, candidates: []Candidate, query: []const u8) !ArrayList(Candidate) {
+pub fn filter(allocator: std.mem.Allocator, candidates: []Candidate, query: []const u8) !ArrayList(Candidate) {
     var filtered = ArrayList(Candidate).init(allocator);
     const match_case = hasUpper(query);
 
@@ -204,7 +205,7 @@ test "fuzzy match" {
 /// rate how closely the query matches the candidate
 fn score(str: []const u8, name: ?[]const u8, query: []const u8, filepath: bool) usize {
     if (filepath) {
-        if (fuzzyMatch(name.?, query)) |s| {
+        if (fuzzyMatch(name.?, query)) |_| {
             return 1;
         }
     }

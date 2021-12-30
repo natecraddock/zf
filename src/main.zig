@@ -1,6 +1,7 @@
 const std = @import("std");
 const heap = std.heap;
 const io = std.io;
+
 const ArrayList = std.ArrayList;
 
 const filter = @import("filter.zig");
@@ -12,7 +13,7 @@ pub fn main() anyerror!void {
     var arena = heap.ArenaAllocator.init(heap.page_allocator);
     defer arena.deinit();
 
-    const allocator = &arena.allocator;
+    const allocator = arena.allocator();
 
     // TODO: read cmd args
 

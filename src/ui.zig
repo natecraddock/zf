@@ -1,9 +1,12 @@
 const std = @import("std");
-const bits = std.os.system;
+const system = std.os.linux;
+
 const ArrayList = std.ArrayList;
 const File = std.fs.File;
 
 const filter = @import("filter.zig");
+
+const TIOCGWINSZ = 0x5413;
 
 pub const Terminal = struct {
     tty: File,
@@ -17,10 +20,10 @@ pub const Terminal = struct {
         var termios = try std.os.tcgetattr(tty.handle);
         var raw_termios = termios;
 
-        raw_termios.iflag &= ~@as(u32, bits.ICRNL);
-        raw_termios.lflag &= ~@as(u32, bits.ICANON | bits.ECHO);
-        raw_termios.cc[bits.VMIN] = 0;
-        raw_termios.cc[bits.VTIME] = 1;
+        raw_termios.iflag &= ~@as(u32, system.ICRNL);
+        raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO);
+        raw_termios.cc[system.V.MIN] = 0;
+        raw_termios.cc[system.V.TIME] = 1;
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
@@ -67,9 +70,9 @@ pub const Terminal = struct {
     };
 
     pub fn windowSize(self: *Terminal) ?WinSize {
-        var size: std.c.winsize = undefined;
+        var size: std.os.linux.winsize = undefined;
 
-        if (std.c.ioctl(self.tty.handle, std.os.TIOCGWINSZ, &size) == -1) {
+        if (std.os.linux.ioctl(self.tty.handle, TIOCGWINSZ, @ptrToInt(&size)) == -1) {
             return null;
         }
 
@@ -186,7 +189,7 @@ fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
-pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
+pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -195,7 +198,8 @@ pub fn run(allocator: *std.mem.Allocator, terminal: *Terminal, candidates: Array
         .selected = 0,
     };
 
-    // ensure enough room to draw all `numRows` lines of output
+    // ensure enough room to draw all `numRows` lines of output by drawing blank lines
+    // effectively scrolling the view
     {
         var i: usize = 0;
         while (i < numRows) : (i += 1) {
