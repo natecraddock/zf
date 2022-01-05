@@ -2,6 +2,7 @@ const std = @import("std");
 const system = std.os.linux;
 
 const ArrayList = std.ArrayList;
+const Candidate = filter.Candidate;
 const File = std.fs.File;
 
 const filter = @import("filter.zig");
@@ -143,7 +144,7 @@ const State = struct {
     selected: usize,
 };
 
-fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: ArrayList(filter.Candidate)) !void {
+fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
     const win_size = terminal.windowSize();
 
     terminal.cursorVisible(false);
@@ -160,8 +161,8 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: Ar
         } else {
             terminal.sgr(0);
         }
-        if (i < candidates.items.len) {
-            var str = candidates.items[i].str[0..std.math.min(win_size.?.x, candidates.items[i].str.len)];
+        if (i < candidates.len) {
+            var str = candidates[i].str[0..std.math.min(win_size.?.x, candidates[i].str.len)];
             try std.fmt.format(terminal.tty.writer(), "{s}\r", .{str});
         }
         if (i == state.selected) terminal.sgr(0);
@@ -199,7 +200,7 @@ fn charOrNull(char: u8) ?u8 {
     return null;
 }
 
-pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
+pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Candidate) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -232,19 +233,19 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
             old_query = try allocator.alloc(u8, query.items.len);
             std.mem.copy(u8, old_query, query.items);
 
-            filtered = try filter.filter(allocator, candidates.items, query.items);
+            filtered = try filter.filter(allocator, candidates, query.items);
             redraw = true;
         }
 
         // did the selection move?
-        // var sorted = std.sort.sort(filter.Candidate, candidates.items, {}, filter.sort);
+        // var sorted = std.sort.sort(Candidate, candidates.items, {}, filter.sort);
         if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
             old_state = state;
             try draw(terminal, &state, query, filtered);
             redraw = false;
         }
 
-        const visible_rows = std.math.min(num_rows, filtered.items.len);
+        const visible_rows = std.math.min(num_rows, filtered.len);
 
         var key = readKey(terminal.tty);
         switch (key) {
@@ -316,10 +317,10 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
                 state.cursor += 1;
             },
             .enter => {
-                if (filtered.items.len == 0) break;
+                if (filtered.len == 0) break;
 
                 var selected = ArrayList(u8).init(allocator);
-                try selected.appendSlice(filtered.items[state.selected].str);
+                try selected.appendSlice(filtered[state.selected].str);
                 return selected;
             },
             .esc => break,

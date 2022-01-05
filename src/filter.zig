@@ -50,7 +50,7 @@ fn toLower(str: []u8) void {
 }
 
 /// read the candidates from the buffer
-pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) !ArrayList(Candidate) {
+pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]Candidate {
     var candidates = ArrayList(Candidate).init(allocator);
 
     // find delimiters
@@ -92,7 +92,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 
     std.sort.sort(Candidate, candidates.items, {}, sort);
 
-    return candidates;
+    return candidates.toOwnedSlice();
 }
 
 test "collectCandidates whitespace" {
@@ -138,7 +138,7 @@ fn hasUpper(query: []const u8) bool {
     return false;
 }
 
-pub fn filter(allocator: std.mem.Allocator, candidates: []Candidate, query: []const u8) !ArrayList(Candidate) {
+pub fn filter(allocator: std.mem.Allocator, candidates: []Candidate, query: []const u8) ![]Candidate {
     var filtered = ArrayList(Candidate).init(allocator);
     const match_case = hasUpper(query);
 
@@ -146,7 +146,7 @@ pub fn filter(allocator: std.mem.Allocator, candidates: []Candidate, query: []co
         for (candidates) |candidate| {
             try filtered.append(candidate);
         }
-        return filtered;
+        return filtered.toOwnedSlice();
     }
 
     for (candidates) |*candidate| {
@@ -165,7 +165,7 @@ pub fn filter(allocator: std.mem.Allocator, candidates: []Candidate, query: []co
         if (candidate.score > 0) try filtered.append(candidate.*);
     }
 
-    return filtered;
+    return filtered.toOwnedSlice();
 }
 
 /// search for needle in haystack and return length of matching substring
