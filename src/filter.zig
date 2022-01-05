@@ -16,7 +16,7 @@ pub const Candidate = struct {
     score: usize = 0,
 };
 
-fn contains(str: []const u8, byte: u8) bool {
+pub fn contains(str: []const u8, byte: u8) bool {
     for (str) |b| {
         if (b == byte) return true;
     }

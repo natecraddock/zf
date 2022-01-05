@@ -189,6 +189,16 @@ fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
+fn charOrNull(char: u8) ?u8 {
+    // word separator chars for c-w word deletion
+    const word_chars = " -_/.";
+    const idx = std.mem.indexOfScalar(u8, word_chars, char);
+    if (idx) |i| {
+        return word_chars[i];
+    }
+    return null;
+}
+
 pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayList(filter.Candidate)) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
@@ -246,9 +256,29 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
                 switch (byte) {
                     // handle ctrl-c here rather than signals to allow for proper cleanup
                     ctrl('c') => break,
+                    ctrl('w') => {
+                        if (state.cursor > 0) {
+                            const first_sep = charOrNull(query.items[state.cursor - 1]);
+                            while (first_sep != null and state.cursor > 0 and first_sep.? == query.items[state.cursor - 1]) {
+                                _ = query.pop();
+                                state.cursor -= 1;
+                            }
+                            while (state.cursor > 0) {
+                                _ = query.pop();
+                                state.cursor -= 1;
+                                if (state.cursor == 0) break;
+
+                                const sep = charOrNull(query.items[state.cursor - 1]);
+                                if (first_sep == null and sep != null) break;
+                                if (first_sep != null and sep != null and first_sep.? == sep.?) break;
+                            }
+                        }
+                    },
                     ctrl('u') => {
-                        state.cursor = 0;
-                        query.clearAndFree();
+                        while (state.cursor > 0) {
+                            _ = query.orderedRemove(state.cursor - 1);
+                            state.cursor -= 1;
+                        }
                     },
                     ctrl('p') => if (state.selected > 0) {
                         state.selected -= 1;
