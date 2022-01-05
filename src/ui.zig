@@ -21,7 +21,7 @@ pub const Terminal = struct {
         var raw_termios = termios;
 
         raw_termios.iflag &= ~@as(u32, system.ICRNL);
-        raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO);
+        raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO | system.ISIG);
         raw_termios.cc[system.V.MIN] = 0;
         raw_termios.cc[system.V.TIME] = 1;
 
@@ -31,7 +31,7 @@ pub const Terminal = struct {
     }
 
     pub fn deinit(self: *Terminal) void {
-        std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch {};
+        std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
     }
 
@@ -136,7 +136,7 @@ fn readKey(file: std.fs.File) Key {
 }
 
 // the number of rows of output
-const numRows: usize = 10;
+const num_rows: usize = 10;
 
 const State = struct {
     cursor: usize,
@@ -150,7 +150,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: Ar
     terminal.clearLine();
 
     // draw the candidates
-    const lines = numRows;
+    const lines = num_rows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
         terminal.lineDown();
@@ -198,50 +198,63 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
         .selected = 0,
     };
 
-    // ensure enough room to draw all `numRows` lines of output by drawing blank lines
+    // ensure enough room to draw all `num_rows` lines of output by drawing blank lines
     // effectively scrolling the view
     {
         var i: usize = 0;
-        while (i < numRows) : (i += 1) {
+        while (i < num_rows) : (i += 1) {
             _ = try terminal.tty.writer().write("\n");
         }
         i = 0;
-        while (i < numRows) : (i += 1) terminal.lineUp();
+        while (i < num_rows) : (i += 1) terminal.lineUp();
     }
 
-    var should_draw = true;
+    var filtered = candidates;
+
+    var old_state = state;
+    var old_query = try allocator.alloc(u8, query.items.len);
+
+    var redraw = true;
     while (true) {
-        var filtered = try filter.filter(allocator, candidates.items, query.items);
-        defer filtered.deinit();
+        // did the query change?
+        if (!std.mem.eql(u8, query.items, old_query)) {
+            allocator.free(old_query);
+            old_query = try allocator.alloc(u8, query.items.len);
+            std.mem.copy(u8, old_query, query.items);
 
+            filtered = try filter.filter(allocator, candidates.items, query.items);
+            redraw = true;
+        }
+
+        // did the selection move?
         // var sorted = std.sort.sort(filter.Candidate, candidates.items, {}, filter.sort);
+        if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
+            old_state = state;
+            try draw(terminal, &state, query, filtered);
+            redraw = false;
+        }
 
-        if (should_draw) try draw(terminal, &state, query, filtered);
-        should_draw = false;
-
-        const visible_rows = std.math.min(numRows, filtered.items.len);
+        const visible_rows = std.math.min(num_rows, filtered.items.len);
 
         var key = readKey(terminal.tty);
         switch (key) {
             .character => |byte| {
                 try query.insert(state.cursor, byte);
                 state.cursor += 1;
-                should_draw = true;
             },
             .control => |byte| {
                 switch (byte) {
+                    // handle ctrl-c here rather than signals to allow for proper cleanup
+                    ctrl('c') => break,
                     ctrl('u') => {
                         state.cursor = 0;
                         query.clearAndFree();
-                        should_draw = true;
                     },
                     ctrl('p') => if (state.selected > 0) {
                         state.selected -= 1;
-                        should_draw = true;
                     },
                     ctrl('n') => if (state.selected < visible_rows - 1) {
                         state.selected += 1;
-                        should_draw = true;
                     },
                     else => {},
                 }
@@ -250,34 +263,27 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
                 if (query.items.len > 0 and state.cursor == query.items.len) {
                     _ = query.pop();
                     state.cursor -= 1;
-                    should_draw = true;
                 } else if (query.items.len > 0 and state.cursor > 0) {
                     _ = query.orderedRemove(state.cursor);
                     state.cursor -= 1;
-                    should_draw = true;
                 }
             },
             .delete => {
                 if (query.items.len > 0 and state.cursor < query.items.len) {
                     _ = query.orderedRemove(state.cursor);
-                    should_draw = true;
                 }
             },
             .up => if (state.selected > 0) {
                 state.selected -= 1;
-                should_draw = true;
             },
             .down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
-                should_draw = true;
             },
             .left => if (state.cursor > 0) {
                 state.cursor -= 1;
-                should_draw = true;
             },
             .right => if (state.cursor < query.items.len) {
                 state.cursor += 1;
-                should_draw = true;
             },
             .enter => {
                 if (filtered.items.len == 0) break;
@@ -296,7 +302,7 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: ArrayL
 
 pub fn cleanUp(terminal: *Terminal) !void {
     // offset to handle prompt line
-    const lines = numRows;
+    const lines = num_rows;
     var i: usize = 0;
     while (i < lines) : (i += 1) {
         terminal.clearLine();
