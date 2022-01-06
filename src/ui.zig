@@ -333,14 +333,14 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
 
 pub fn cleanUp(terminal: *Terminal) !void {
     // offset to handle prompt line
-    const lines = num_rows;
     var i: usize = 0;
-    while (i < lines) : (i += 1) {
+    while (i < num_rows) : (i += 1) {
         terminal.clearLine();
         terminal.lineDown();
     }
+    terminal.clearLine();
     i = 0;
-    while (i < lines) : (i += 1) {
+    while (i < num_rows) : (i += 1) {
         terminal.lineUp();
     }
 }
