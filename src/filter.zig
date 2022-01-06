@@ -43,12 +43,6 @@ test "is path" {
     try testing.expect(!isPath("Makefile"));
 }
 
-fn toLower(str: []u8) void {
-    for (str) |*c| {
-        c.* = std.ascii.toLower(c.*);
-    }
-}
-
 /// read the candidates from the buffer
 pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]Candidate {
     var candidates = ArrayList(Candidate).init(allocator);
@@ -61,7 +55,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
             if (index - start != 0) {
                 var lower = try allocator.alloc(u8, index - start);
                 std.mem.copy(u8, lower, buf[start..index]);
-                toLower(lower);
+                _ = std.ascii.lowerString(lower, lower);
 
                 try candidates.append(.{ .str = buf[start..index], .str_lower = lower });
             }
@@ -73,7 +67,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
     if (start < buf.len) {
         var lower = try allocator.alloc(u8, buf.len - start);
         std.mem.copy(u8, lower, buf[start..]);
-        toLower(lower);
+        _ = std.ascii.lowerString(lower, lower);
 
         try candidates.append(.{ .str = buf[start..], .str_lower = lower });
     }
@@ -90,45 +84,57 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
         }
     }
 
-    std.sort.sort(Candidate, candidates.items, {}, sort);
+    // std.sort.sort(Candidate, candidates.items, {}, sort);
 
     return candidates.toOwnedSlice();
 }
 
 test "collectCandidates whitespace" {
     var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
-    defer candidates.deinit();
+    defer {
+        for (candidates) |c| {
+            testing.allocator.free(c.str_lower);
+        }
+        testing.allocator.free(candidates);
+    }
 
-    const items = candidates.items;
-    try testing.expectEqual(@as(usize, 4), items.len);
-    try testing.expectEqualStrings("first", items[0].str);
-    try testing.expectEqualStrings("second", items[1].str);
-    try testing.expectEqualStrings("third", items[2].str);
-    try testing.expectEqualStrings("fourth", items[3].str);
+    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqualStrings("first", candidates[0].str);
+    try testing.expectEqualStrings("second", candidates[1].str);
+    try testing.expectEqualStrings("third", candidates[2].str);
+    try testing.expectEqualStrings("fourth", candidates[3].str);
 }
 
 test "collectCandidates newline" {
     var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
-    defer candidates.deinit();
+    defer {
+        for (candidates) |c| {
+            testing.allocator.free(c.str_lower);
+        }
+        testing.allocator.free(candidates);
+    }
 
-    const items = candidates.items;
-    try testing.expectEqual(@as(usize, 4), items.len);
-    try testing.expectEqualStrings("first", items[0].str);
-    try testing.expectEqualStrings("second", items[1].str);
-    try testing.expectEqualStrings("third", items[2].str);
-    try testing.expectEqualStrings("fourth", items[3].str);
+    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqualStrings("first", candidates[0].str);
+    try testing.expectEqualStrings("second", candidates[1].str);
+    try testing.expectEqualStrings("third", candidates[2].str);
+    try testing.expectEqualStrings("fourth", candidates[3].str);
 }
 
 test "collectCandidates excess whitespace" {
     var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
-    defer candidates.deinit();
+    defer {
+        for (candidates) |c| {
+            testing.allocator.free(c.str_lower);
+        }
+        testing.allocator.free(candidates);
+    }
 
-    const items = candidates.items;
-    try testing.expectEqual(@as(usize, 4), items.len);
-    try testing.expectEqualStrings("first", items[0].str);
-    try testing.expectEqualStrings("second", items[1].str);
-    try testing.expectEqualStrings("third", items[2].str);
-    try testing.expectEqualStrings("fourth", items[3].str);
+    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqualStrings("first", candidates[0].str);
+    try testing.expectEqualStrings("second", candidates[1].str);
+    try testing.expectEqualStrings("third", candidates[2].str);
+    try testing.expectEqualStrings("fourth", candidates[3].str);
 }
 
 fn hasUpper(query: []const u8) bool {
