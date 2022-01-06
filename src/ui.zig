@@ -233,13 +233,12 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
             old_query = try allocator.alloc(u8, query.items.len);
             std.mem.copy(u8, old_query, query.items);
 
-            filtered = try filter.filter(allocator, candidates, query.items);
+            filtered = try filter.rankCandidates(allocator, candidates, query.items);
             redraw = true;
             state.selected = 0;
         }
 
         // did the selection move?
-        // var sorted = std.sort.sort(Candidate, candidates.items, {}, filter.sort);
         if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
             old_state = state;
             try draw(terminal, &state, query, filtered);
