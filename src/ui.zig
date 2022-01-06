@@ -235,6 +235,7 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
 
             filtered = try filter.filter(allocator, candidates, query.items);
             redraw = true;
+            state.selected = 0;
         }
 
         // did the selection move?
