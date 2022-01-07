@@ -7,8 +7,6 @@ const File = std.fs.File;
 
 const filter = @import("filter.zig");
 
-const TIOCGWINSZ = 0x5413;
-
 pub const Terminal = struct {
     tty: File,
     termios: std.os.termios,
@@ -73,7 +71,7 @@ pub const Terminal = struct {
     pub fn windowSize(self: *Terminal) ?WinSize {
         var size: std.os.linux.winsize = undefined;
 
-        if (std.os.linux.ioctl(self.tty.handle, TIOCGWINSZ, @ptrToInt(&size)) == -1) {
+        if (std.os.linux.ioctl(self.tty.handle, std.os.system.T.IOCGWINSZ, @ptrToInt(&size)) == -1) {
             return null;
         }
 
