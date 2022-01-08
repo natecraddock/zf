@@ -8,20 +8,22 @@ const filter = @import("filter.zig");
 const ui = @import("ui.zig");
 
 const version = "0.1";
+const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =
-    \\Usage: zf [OPTION]...
-    \\-q, --query   Filter using the given query
+    \\Usage: zf [options]
+    \\-q, --query   Skip interactive use and filter using the given query
+    \\-v, --version Show version information and exit
     \\-h, --help    Display this help and exit
 ;
 
 const Config = struct {
-    help: bool = false,
     skip_ui: bool = false,
     query: []u8 = undefined,
 };
 
 fn parseArgs(allocator: std.mem.Allocator) !Config {
+    const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
     const args = try std.process.argsAlloc(allocator);
 
@@ -31,10 +33,14 @@ fn parseArgs(allocator: std.mem.Allocator) !Config {
     var skip = false;
     for (args[1..]) |arg, i| {
         if (skip) continue;
-        const index = i + 1;
 
+        const index = i + 1;
         if (eql(u8, arg, "-h") or eql(u8, arg, "--help")) {
-            config.help = true;
+            try stdout.print("{s}\n", .{help});
+            std.process.exit(0);
+        } else if (eql(u8, arg, "-v") or eql(u8, arg, "--version")) {
+            try stdout.print("{s}\n", .{version_str});
+            std.process.exit(0);
         } else if (eql(u8, arg, "-q") or eql(u8, arg, "--query")) {
             config.skip_ui = true;
 
@@ -68,13 +74,6 @@ pub fn main() anyerror!void {
     const allocator = arena.allocator();
 
     const config = try parseArgs(allocator);
-    _ = config;
-
-    // help ignores all other args and quits
-    if (config.help) {
-        try stdout.print("{s}\n", .{help});
-        return;
-    }
 
     // read all lines or exit on out of memory
     var stdin = io.getStdIn().reader();
