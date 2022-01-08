@@ -5,14 +5,9 @@ const testing = std.testing;
 /// Candidates are the strings read from stdin
 /// if the filepath matching algorithm is used, then name will be
 /// used to store the filename of the path in str.
-///
-/// lowercase versions of the full path and of the name are stored
-/// for smart case matching
 pub const Candidate = struct {
     str: []const u8,
-    str_lower: []const u8,
     name: ?[]const u8 = null,
-    name_lower: ?[]const u8 = null,
     rank: usize = 0,
 };
 
@@ -53,11 +48,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
         if (char == delimiter) {
             // add to arraylist only if slice is not all delimiters
             if (index - start != 0) {
-                var lower = try allocator.alloc(u8, index - start);
-                std.mem.copy(u8, lower, buf[start..index]);
-                _ = std.ascii.lowerString(lower, lower);
-
-                try candidates.append(.{ .str = buf[start..index], .str_lower = lower });
+                try candidates.append(.{ .str = buf[start..index] });
             }
             start = index + 1;
         }
@@ -65,11 +56,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 
     // catch the end if stdio didn't end in a delimiter
     if (start < buf.len) {
-        var lower = try allocator.alloc(u8, buf.len - start);
-        std.mem.copy(u8, lower, buf[start..]);
-        _ = std.ascii.lowerString(lower, lower);
-
-        try candidates.append(.{ .str = buf[start..], .str_lower = lower });
+        try candidates.append(.{ .str = buf[start..] });
     }
 
     // determine if these candidates are filepaths
@@ -80,23 +67,15 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
     if (filename_match) {
         for (candidates.items) |*candidate| {
             candidate.name = std.fs.path.basename(candidate.str);
-            candidate.name_lower = std.fs.path.basename(candidate.str_lower);
         }
     }
-
-    // std.sort.sort(Candidate, candidates.items, {}, sort);
 
     return candidates.toOwnedSlice();
 }
 
 test "collectCandidates whitespace" {
     var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
-    defer {
-        for (candidates) |c| {
-            testing.allocator.free(c.str_lower);
-        }
-        testing.allocator.free(candidates);
-    }
+    defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
     try testing.expectEqualStrings("first", candidates[0].str);
@@ -107,12 +86,7 @@ test "collectCandidates whitespace" {
 
 test "collectCandidates newline" {
     var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
-    defer {
-        for (candidates) |c| {
-            testing.allocator.free(c.str_lower);
-        }
-        testing.allocator.free(candidates);
-    }
+    defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
     try testing.expectEqualStrings("first", candidates[0].str);
@@ -123,12 +97,7 @@ test "collectCandidates newline" {
 
 test "collectCandidates excess whitespace" {
     var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
-    defer {
-        for (candidates) |c| {
-            testing.allocator.free(c.str_lower);
-        }
-        testing.allocator.free(candidates);
-    }
+    defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
     try testing.expectEqualStrings("first", candidates[0].str);
@@ -150,6 +119,7 @@ fn hasUpper(query: []const u8) bool {
 /// in a tui or output to stdout
 pub fn rankCandidates(allocator: std.mem.Allocator, candidates: []Candidate, query: []const u8) ![]Candidate {
     var ranked = ArrayList(Candidate).init(allocator);
+    const smart_case = !hasUpper(query);
 
     if (query.len == 0) {
         for (candidates) |candidate| {
@@ -162,7 +132,7 @@ pub fn rankCandidates(allocator: std.mem.Allocator, candidates: []Candidate, que
     defer allocator.free(query_tokens);
     for (candidates) |candidate| {
         var c = candidate;
-        if (rankCandidate(&c, query_tokens)) {
+        if (rankCandidate(&c, query_tokens, smart_case)) {
             try ranked.append(c);
         }
     }
@@ -184,17 +154,28 @@ fn splitQuery(allocator: std.mem.Allocator, query: []const u8) ![][]const u8 {
     return tokens.toOwnedSlice();
 }
 
+const indexOfCaseSensitive = std.mem.indexOfScalarPos;
+
+fn indexOf(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
+    var i: usize = start_index;
+    while (i < slice.len) : (i += 1) {
+        if (std.ascii.toLower(slice[i]) == value) return i;
+    }
+    return null;
+}
+
 const IndexIterator = struct {
     str: []const u8,
     char: u8,
     index: usize = 0,
+    smart_case: bool,
 
-    pub fn init(str: []const u8, char: u8) @This() {
-        return .{ .str = str, .char = char };
+    pub fn init(str: []const u8, char: u8, smart_case: bool) @This() {
+        return .{ .str = str, .char = char, .smart_case = smart_case };
     }
 
     pub fn next(self: *@This()) ?usize {
-        const index = std.mem.indexOfScalarPos(u8, self.str, self.index, self.char);
+        const index = if (self.smart_case) indexOf(u8, self.str, self.index, self.char) else indexOfCaseSensitive(u8, self.str, self.index, self.char);
         if (index) |i| self.index = i + 1;
         return index;
     }
@@ -203,7 +184,7 @@ const IndexIterator = struct {
 /// rank a candidate against the given query tokens
 ///
 /// algorithm inspired by https://github.com/garybernhardt/selecta
-fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8) bool {
+fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: bool) bool {
     candidate.rank = 0;
 
     // the candidate must contain all of the characters (in order) in each token.
@@ -211,22 +192,22 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8) bool {
     for (query_tokens) |token| {
         // iterate over the indexes where the first char of the token matches
         var best_rank: ?usize = null;
-        var it = IndexIterator.init(candidate.name.?, token[0]);
+        var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
 
         // TODO: rank better for name matches
         while (it.next()) |start_index| {
-            if (scanToEnd(candidate.name.?, token[1..], start_index)) |rank| {
+            if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |rank| {
                 if (best_rank == null or rank < best_rank.?) best_rank = rank -| 2;
-            }
+            } else break;
         }
 
         // retry on the full string
         if (best_rank == null) {
-            it = IndexIterator.init(candidate.str, token[0]);
+            it = IndexIterator.init(candidate.str, token[0], smart_case);
             while (it.next()) |start_index| {
-                if (scanToEnd(candidate.str, token[1..], start_index)) |rank| {
+                if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |rank| {
                     if (best_rank == null or rank < best_rank.?) best_rank = rank;
-                }
+                } else break;
             }
         }
 
@@ -241,13 +222,13 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8) bool {
 
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
-fn scanToEnd(str: []const u8, token: []const u8, start_index: usize) ?usize {
+fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case: bool) ?usize {
     var rank: usize = 1;
     var last_index = start_index;
     var last_sequential = false;
 
     for (token) |c| {
-        const index = std.mem.indexOfScalarPos(u8, str, last_index, c);
+        const index = if (smart_case) indexOf(u8, str, last_index, c) else indexOfCaseSensitive(u8, str, last_index, c);
         if (index == null) return null;
 
         if (index.? == last_index + 1) {
