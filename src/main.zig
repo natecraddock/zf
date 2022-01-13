@@ -49,7 +49,7 @@ fn parseArgs(allocator: std.mem.Allocator) !Config {
             if (index + 1 > args.len - 1) {
                 try stderr.print("zf: option '{s}' requires an argument\n", .{arg});
                 try stderr.print("{s}\n", .{help});
-                std.process.exit(1);
+                std.process.exit(2);
             }
 
             config.query = try allocator.alloc(u8, args[index + 1].len);
@@ -58,7 +58,7 @@ fn parseArgs(allocator: std.mem.Allocator) !Config {
         } else {
             try stderr.print("zf: unrecognized option '{s}'\n", .{arg});
             try stderr.print("{s}\n", .{help});
-            std.process.exit(1);
+            std.process.exit(2);
         }
     }
 
@@ -82,10 +82,12 @@ pub fn main() anyerror!void {
 
     const delimiter = '\n';
     var candidates = try filter.collectCandidates(allocator, buf, delimiter);
-    if (candidates.len == 0) return;
+    if (candidates.len == 0) std.process.exit(1);
 
     if (config.skip_ui) {
-        for (try filter.rankCandidates(allocator, candidates, config.query)) |candidate| {
+        const filtered = try filter.rankCandidates(allocator, candidates, config.query);
+        if (filtered.len == 0) std.process.exit(1);
+        for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});
         }
     } else {
@@ -97,7 +99,7 @@ pub fn main() anyerror!void {
         if (selected) |result| {
             defer result.deinit();
             try stdout.print("{s}\n", .{result.items});
-        }
+        } else std.process.exit(1);
     }
 }
 
