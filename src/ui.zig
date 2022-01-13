@@ -21,7 +21,7 @@ pub const Terminal = struct {
 
         raw_termios.iflag &= ~@as(u32, system.ICRNL);
         raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO | system.ISIG);
-        raw_termios.cc[system.V.MIN] = 1;
+        raw_termios.cc[system.V.MIN] = 0;
         raw_termios.cc[system.V.TIME] = 1;
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
