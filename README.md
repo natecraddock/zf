@@ -1,11 +1,11 @@
 # zf
 
-zf is a commandline fuzzy finder with a focus on accurate filepath matching
+zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
 ## Building
 
-To provide easier access, zf targets the latest stable version of Zig. Compile
-with `zig build`.
+zf targets the latest stable release of Zig. Compile with `zig build
+-Drelease-fast=true`.
 
 ## Use
 
@@ -16,8 +16,36 @@ or io redirection.
 
 I created zf to solve a problem I found in all of the fuzzy finders I tried:
 none prioritized matches on filenames. Because the filenames in a tree are
-typically unique, zf attempts to intelligently alter its matching algorithm to
-rank matches on filenames higher.
+typically unique, zf ranks matches on filenames higher.
+
+zf also treats the query string as a sequence of space-separated tokens. This
+allows for faster filtering when filenames are not unique.
+
+Imagine searching for an `__init__.py` file in a Python project.
+
+```text
+> init
+./zygrader/__init__.py
+./zygrader/ui/__init__.py
+./zygrader/data/__init__.py
+./zygrader/config/__init__.py
+```
+
+At this point you can either move the selection down with `c-n` to find
+`config/__init__.py`, or you can add a new token to the query string.
+
+```text
+> init c
+./zygrader/config/__init__.py
+```
+
+Treating the query string as a sequence of tokens makes filtering more
+efficient.
+
+zf will remain simple:
+* no full-window interface
+* minimal config and options
+* sensible defaults
 
 ## Does the name 'zf' mean anything?
 
@@ -34,8 +62,7 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-* add commandline arguments
-* optimize ranking algorithm
 * tidy code
 * write neovim telescope sorter extension
+* unicode support
 * release version 1.0
