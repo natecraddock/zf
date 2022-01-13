@@ -12,6 +12,7 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =
     \\Usage: zf [options]
+    \\
     \\-q, --query   Skip interactive use and filter using the given query
     \\-v, --version Show version information and exit
     \\-h, --help    Display this help and exit
