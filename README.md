@@ -2,7 +2,13 @@
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
-## Building
+## Installation
+
+### Arch Linux
+
+An [AUR package](https://aur.archlinux.org/packages/zf/) is available.
+
+### Building from source
 
 zf targets the latest stable release of Zig. Compile with `zig build
 -Drelease-fast=true`.
