@@ -1,0 +1,93 @@
+.TH ZF 1 "2022-01-12" "zf 0.1"
+
+.SH NAME
+zf -\ a commandline fuzzy finder that prioritizes matches on filenames
+
+.SH SYNOPSIS
+.B zf [options]
+
+.SH DESCRIPTION
+.B zf is a simple, general-purpose fuzzy finder that prioritizes matches on
+filenames.
+
+zf reads a list of newline separated strings on stdin and displays an
+interactive interface. Pressing enter outputs the selected line on stdout. Text
+may be entered to filter the list of strings.
+
+.SH OPTIONS
+.TP
+.BR \-q ", " \-\-query
+Skip interactive use and filter using the given query
+
+.TP
+.BR \-v ", " \-\-version
+Show version information and exit
+
+.TP
+.BR \-h ", " \-\-help
+Display help and exit
+
+.SH COMMANDS
+
+.TP
+.BR enter
+Print the selected line on stdout and exit
+
+.TP
+.BR "escape, ctrl-c"
+Exit the finder without selecting anything
+
+.TP
+.BR "up, ctrl-p"
+Select the next line up
+
+.TP
+.BR "down ctrl-j"
+Select the next line down
+
+.TP
+.BR backspace
+Delete the character before the cursor
+
+.TP
+.BR delete
+Delete the character under the cursor
+
+.TP
+.BR ctrl-w
+Delete the word before the cursor
+
+.TP
+.BR ctrl-u
+Delete from the cursor to the beginning of the line
+
+.SH EXAMPLES
+
+.TP
+.BR "find -type f | zf"
+Fuzzy find on the file tree in the current directory
+
+.TP
+.BR "vim $(find -type f | zf)"
+Fuzzy find on the file tree and open the selcted file in vim
+
+.TP
+.BR "git switch $(git branch | cut -c 3- | zf)"
+Switch to selected git branch
+
+.SH EXIT STATUS
+
+.TP
+.BR 0
+Success
+
+.TP
+.BR 1
+No candidates given on stdin or aborted the interactive interface with esc or ctrl-c
+
+.TP
+.BR 2
+Error
+
+.SH AUTHOR
+Written by Nathan Craddock
