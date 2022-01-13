@@ -81,6 +81,7 @@ pub fn main() anyerror!void {
 
     const delimiter = '\n';
     var candidates = try filter.collectCandidates(allocator, buf, delimiter);
+    if (candidates.len == 0) return;
 
     if (config.skip_ui) {
         for (try filter.rankCandidates(allocator, candidates, config.query)) |candidate| {
