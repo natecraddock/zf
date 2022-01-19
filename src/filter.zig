@@ -2,6 +2,23 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const testing = std.testing;
 
+// public function interface for ranking a single item with the zf algorithm
+export fn rankItem(str: [*:0]const u8, tokens: [*][*:0]const u8, num_tokens: usize) c_int {
+    const string = std.mem.span(str);
+
+    var rank: c_int = 0;
+    var index: usize = 0;
+    while (index < num_tokens) : (index += 1) {
+        const token = std.mem.span(tokens[index]);
+        var candidate: Candidate = .{ .str = string, .name = string };
+        if (rankToken(&candidate, token, true)) |r| {
+            rank += @intCast(c_int, r);
+        } else return -1;
+    }
+
+    return rank;
+}
+
 /// Candidates are the strings read from stdin
 /// if the filepath matching algorithm is used, then name will be
 /// used to store the filename of the path in str.
@@ -190,34 +207,38 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
     for (query_tokens) |token| {
-        // iterate over the indexes where the first char of the token matches
-        var best_rank: ?usize = null;
-        var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
-
-        // TODO: rank better for name matches
-        while (it.next()) |start_index| {
-            if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |rank| {
-                if (best_rank == null or rank < best_rank.?) best_rank = rank -| 2;
-            } else break;
-        }
-
-        // retry on the full string
-        if (best_rank == null) {
-            it = IndexIterator.init(candidate.str, token[0], smart_case);
-            while (it.next()) |start_index| {
-                if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |rank| {
-                    if (best_rank == null or rank < best_rank.?) best_rank = rank;
-                } else break;
-            }
-        }
-
-        if (best_rank == null) return false;
-
-        candidate.rank += best_rank.?;
+        if (rankToken(candidate, token, smart_case)) |r| {
+            candidate.rank += r;
+        } else return false;
     }
 
     // all tokens matched and the best ranks for each tokens are summed
     return true;
+}
+
+fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize {
+    // iterate over the indexes where the first char of the token matches
+    var best_rank: ?usize = null;
+    var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
+
+    // TODO: rank better for name matches
+    while (it.next()) |start_index| {
+        if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |rank| {
+            if (best_rank == null or rank < best_rank.?) best_rank = rank -| 2;
+        } else break;
+    }
+
+    // retry on the full string
+    if (best_rank == null) {
+        it = IndexIterator.init(candidate.str, token[0], smart_case);
+        while (it.next()) |start_index| {
+            if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |rank| {
+                if (best_rank == null or rank < best_rank.?) best_rank = rank;
+            } else break;
+        }
+    }
+
+    return best_rank;
 }
 
 /// this is the core of the ranking algorithm. special precedence is given to
