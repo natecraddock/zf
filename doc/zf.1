@@ -16,8 +16,14 @@ may be entered to filter the list of strings.
 
 .SH OPTIONS
 .TP
-.BR \-q ", " \-\-query
+.BR \-f ", " \-\-filter
 Skip interactive use and filter using the given query
+
+.TP
+.BR \-l ", " \-\-lines
+Set the maximum number of result lines to show. Defaults to 10. Will be clamped
+to the number of candidates or the height of the terminal, whichever is
+greater. Set to a large number (like 1000) to display zf full screen.
 
 .TP
 .BR \-v ", " \-\-version
