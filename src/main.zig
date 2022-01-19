@@ -1,6 +1,7 @@
 const std = @import("std");
 const heap = std.heap;
 const io = std.io;
+const testing = std.testing;
 
 const ArrayList = std.ArrayList;
 
@@ -13,56 +14,125 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 const help =
     \\Usage: zf [options]
     \\
-    \\-q, --query   Skip interactive use and filter using the given query
+    \\-f, --filter  Skip interactive use and filter using the given query
     \\-v, --version Show version information and exit
     \\-h, --help    Display this help and exit
 ;
 
 const Config = struct {
+    help: bool = false,
+    version: bool = false,
     skip_ui: bool = false,
     query: []u8 = undefined,
+
+    // HACK: error unions cannot return a value, so return error messages in
+    // the config struct instead
+    err: bool = false,
+    err_str: []u8 = undefined,
 };
 
-fn parseArgs(allocator: std.mem.Allocator) !Config {
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
-    const args = try std.process.argsAlloc(allocator);
-
+fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
     var config: Config = .{};
 
     const eql = std.mem.eql;
     var skip = false;
     for (args[1..]) |arg, i| {
-        if (skip) continue;
+        if (skip) {
+            skip = false;
+            continue;
+        }
 
         const index = i + 1;
         if (eql(u8, arg, "-h") or eql(u8, arg, "--help")) {
-            try stdout.print("{s}\n", .{help});
-            std.process.exit(0);
+            config.help = true;
+            return config;
         } else if (eql(u8, arg, "-v") or eql(u8, arg, "--version")) {
-            try stdout.print("{s}\n", .{version_str});
-            std.process.exit(0);
-        } else if (eql(u8, arg, "-q") or eql(u8, arg, "--query")) {
+            config.version = true;
+            return config;
+        } else if (eql(u8, arg, "-f") or eql(u8, arg, "--filter")) {
             config.skip_ui = true;
 
             // read query
             if (index + 1 > args.len - 1) {
-                try stderr.print("zf: option '{s}' requires an argument\n", .{arg});
-                try stderr.print("{s}\n", .{help});
-                std.process.exit(2);
+                config.err = true;
+                config.err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "zf: option '{s}' requires an argument\n{s}",
+                    .{ arg, help },
+                );
+                return config;
             }
 
             config.query = try allocator.alloc(u8, args[index + 1].len);
             std.mem.copy(u8, config.query, args[index + 1]);
             skip = true;
         } else {
-            try stderr.print("zf: unrecognized option '{s}'\n", .{arg});
-            try stderr.print("{s}\n", .{help});
-            std.process.exit(2);
+            config.err = true;
+            config.err_str = try std.fmt.allocPrint(
+                allocator,
+                "zf: unrecognized option '{s}'\n{s}",
+                .{ arg, help },
+            );
+            return config;
         }
     }
 
     return config;
+}
+
+test "parse args" {
+    {
+        const args = [_][]const u8{"zf"};
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{};
+        try testing.expectEqual(expected, config);
+    }
+    {
+        const args = [_][]const u8{ "zf", "--help" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .help = true };
+        try testing.expectEqual(expected, config);
+    }
+    {
+        const args = [_][]const u8{ "zf", "--version" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .version = true };
+        try testing.expectEqual(expected, config);
+    }
+    {
+        const args = [_][]const u8{ "zf", "-v", "-h" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .help = false, .version = true };
+        try testing.expectEqual(expected, config);
+    }
+    {
+        const args = [_][]const u8{ "zf", "-f", "query" };
+        const config = try parseArgs(testing.allocator, &args);
+        defer testing.allocator.free(config.query);
+
+        try testing.expect(config.skip_ui);
+        try testing.expectEqualStrings("query", config.query);
+    }
+
+    // failure cases
+    {
+        const args = [_][]const u8{ "zf", "--filter" };
+        const config = try parseArgs(testing.allocator, &args);
+        defer testing.allocator.free(config.err_str);
+        try testing.expect(config.err);
+    }
+    {
+        const args = [_][]const u8{ "zf", "asdf" };
+        const config = try parseArgs(testing.allocator, &args);
+        defer testing.allocator.free(config.err_str);
+        try testing.expect(config.err);
+    }
+    {
+        const args = [_][]const u8{ "zf", "bad arg here", "--help" };
+        const config = try parseArgs(testing.allocator, &args);
+        defer testing.allocator.free(config.err_str);
+        try testing.expect(config.err);
+    }
 }
 
 pub fn main() anyerror!void {
@@ -72,9 +142,22 @@ pub fn main() anyerror!void {
     defer arena.deinit();
 
     const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
     const allocator = arena.allocator();
 
-    const config = try parseArgs(allocator);
+    const args = try std.process.argsAlloc(allocator);
+    const config = try parseArgs(allocator, args);
+
+    if (config.err) {
+        try stderr.print("{s}\n", .{config.err_str});
+        std.process.exit(2);
+    } else if (config.help) {
+        try stdout.print("{s}\n", .{help});
+        std.process.exit(0);
+    } else if (config.version) {
+        try stdout.print("{s}\n", .{version_str});
+        std.process.exit(0);
+    }
 
     // read all lines or exit on out of memory
     var stdin = io.getStdIn().reader();
