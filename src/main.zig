@@ -15,6 +15,7 @@ const help =
     \\Usage: zf [options]
     \\
     \\-f, --filter  Skip interactive use and filter using the given query
+    \\-l, --lines   Set the maximum number of result lines to show (default 10)
     \\-v, --version Show version information and exit
     \\-h, --help    Display this help and exit
 ;
@@ -22,6 +23,7 @@ const help =
 const Config = struct {
     help: bool = false,
     version: bool = false,
+    lines: usize = 10,
     skip_ui: bool = false,
     query: []u8 = undefined,
 
@@ -31,6 +33,7 @@ const Config = struct {
     err_str: []u8 = undefined,
 };
 
+// TODO: handle args immediately after a short arg, i.e. -qhello or -l5
 fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
     var config: Config = .{};
 
@@ -49,6 +52,20 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
         } else if (eql(u8, arg, "-v") or eql(u8, arg, "--version")) {
             config.version = true;
             return config;
+        } else if (eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
+            if (index + 1 > args.len - 1) {
+                config.err = true;
+                config.err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "zf: option '{s}' requires an argument\n{s}",
+                    .{ arg, help },
+                );
+                return config;
+            }
+
+            config.lines = try std.fmt.parseUnsigned(usize, args[index + 1], 10);
+            if (config.lines == 0) return error.InvalidCharacter;
+            skip = true;
         } else if (eql(u8, arg, "-f") or eql(u8, arg, "--filter")) {
             config.skip_ui = true;
 
@@ -113,6 +130,12 @@ test "parse args" {
         try testing.expect(config.skip_ui);
         try testing.expectEqualStrings("query", config.query);
     }
+    {
+        const args = [_][]const u8{ "zf", "-l", "12" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .lines = 12 };
+        try testing.expectEqual(expected, config);
+    }
 
     // failure cases
     {
@@ -133,6 +156,10 @@ test "parse args" {
         defer testing.allocator.free(config.err_str);
         try testing.expect(config.err);
     }
+    {
+        const args = [_][]const u8{ "zf", "--lines", "-10" };
+        try testing.expectError(error.InvalidCharacter, parseArgs(testing.allocator, &args));
+    }
 }
 
 pub fn main() anyerror!void {
@@ -146,7 +173,13 @@ pub fn main() anyerror!void {
     const allocator = arena.allocator();
 
     const args = try std.process.argsAlloc(allocator);
-    const config = try parseArgs(allocator, args);
+    const config = parseArgs(allocator, args) catch |e| switch (e) {
+        error.InvalidCharacter, error.Overflow => {
+            try stderr.print("Number of lines must be an integer greater than 0\n", .{});
+            std.process.exit(2);
+        },
+        else => return e,
+    };
 
     if (config.err) {
         try stderr.print("{s}\n", .{config.err_str});
@@ -174,7 +207,7 @@ pub fn main() anyerror!void {
             try stdout.print("{s}\n", .{candidate.str});
         }
     } else {
-        var terminal = try ui.Terminal.init();
+        var terminal = try ui.Terminal.init(@minimum(candidates.len, config.lines));
         var selected = try ui.run(allocator, &terminal, candidates);
         try ui.cleanUp(&terminal);
         terminal.deinit();

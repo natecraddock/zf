@@ -12,7 +12,10 @@ pub const Terminal = struct {
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
-    pub fn init() !Terminal {
+    height: usize = undefined,
+    max_height: usize,
+
+    pub fn init(max_height: usize) !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .read = true, .write = true });
 
         // store original terminal settings to restore later
@@ -26,12 +29,22 @@ pub const Terminal = struct {
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
-        return Terminal{ .tty = tty, .termios = termios, .raw_termios = raw_termios };
+        return Terminal{
+            .tty = tty,
+            .termios = termios,
+            .raw_termios = raw_termios,
+            .max_height = max_height,
+        };
     }
 
     pub fn deinit(self: *Terminal) void {
         std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
+    }
+
+    pub fn determineHeight(self: *Terminal) void {
+        const win_size = self.windowSize();
+        self.height = std.math.clamp(self.max_height, 1, win_size.?.y - 1);
     }
 
     fn write(self: *Terminal, args: anytype) void {
@@ -147,9 +160,8 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     terminal.clearLine();
 
     // draw the candidates
-    const lines = num_rows;
     var i: usize = 0;
-    while (i < lines) : (i += 1) {
+    while (i < terminal.height) : (i += 1) {
         terminal.lineDown();
         terminal.clearLine();
         if (i == state.selected) {
@@ -165,7 +177,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     }
     terminal.sgr(0);
     i = 0;
-    while (i < lines) : (i += 1) {
+    while (i < terminal.height) : (i += 1) {
         terminal.lineUp();
     }
 
@@ -207,13 +219,14 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
 
     // ensure enough room to draw all `num_rows` lines of output by drawing blank lines
     // effectively scrolling the view
+    terminal.determineHeight();
     {
         var i: usize = 0;
-        while (i < num_rows) : (i += 1) {
+        while (i < terminal.height) : (i += 1) {
             _ = try terminal.tty.writer().write("\n");
         }
         i = 0;
-        while (i < num_rows) : (i += 1) terminal.lineUp();
+        while (i < terminal.height) : (i += 1) terminal.lineUp();
     }
 
     var filtered = candidates;
@@ -241,7 +254,7 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
             redraw = false;
         }
 
-        const visible_rows = std.math.min(num_rows, filtered.len);
+        const visible_rows = std.math.min(terminal.height, filtered.len);
 
         var key = readKey(terminal.tty);
         switch (key) {
@@ -330,13 +343,13 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
 pub fn cleanUp(terminal: *Terminal) !void {
     // offset to handle prompt line
     var i: usize = 0;
-    while (i < num_rows) : (i += 1) {
+    while (i < terminal.height) : (i += 1) {
         terminal.clearLine();
         terminal.lineDown();
     }
     terminal.clearLine();
     i = 0;
-    while (i < num_rows) : (i += 1) {
+    while (i < terminal.height) : (i += 1) {
         terminal.lineUp();
     }
 }
