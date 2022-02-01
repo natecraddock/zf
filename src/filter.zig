@@ -32,6 +32,10 @@ pub const Candidate = struct {
     str: []const u8,
     name: ?[]const u8 = null,
     rank: usize = 0,
+    range: ?struct {
+        start: usize = 0,
+        end: usize = 0,
+    } = null,
 };
 
 pub fn contains(str: []const u8, byte: u8) bool {
@@ -228,9 +232,13 @@ fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize 
     var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
 
     // TODO: rank better for name matches
+    const offs = candidate.str.len - candidate.name.?.len;
     while (it.next()) |start_index| {
-        if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |rank| {
-            if (best_rank == null or rank < best_rank.?) best_rank = rank -| 2;
+        if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |match| {
+            if (best_rank == null or match.rank < best_rank.?) {
+                best_rank = match.rank -| 2;
+                candidate.range = .{ .start = match.start + offs, .end = match.end + offs };
+            }
         } else break;
     }
 
@@ -238,8 +246,11 @@ fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize 
     if (best_rank == null) {
         it = IndexIterator.init(candidate.str, token[0], smart_case);
         while (it.next()) |start_index| {
-            if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |rank| {
-                if (best_rank == null or rank < best_rank.?) best_rank = rank;
+            if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |match| {
+                if (best_rank == null or match.rank < best_rank.?) {
+                    best_rank = match.rank;
+                    candidate.range = .{ .start = match.start, .end = match.end };
+                }
             } else break;
         }
     }
@@ -247,10 +258,16 @@ fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize 
     return best_rank;
 }
 
+const Match = struct {
+    rank: usize,
+    start: usize,
+    end: usize,
+};
+
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
-fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case: bool) ?usize {
-    var rank: usize = 1;
+fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case: bool) ?Match {
+    var match: Match = .{ .rank = 1, .start = start_index, .end = 0 };
     var last_index = start_index;
     var last_sequential = false;
 
@@ -262,18 +279,19 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case:
             // sequential matches only count the first character
             if (!last_sequential) {
                 last_sequential = true;
-                rank += 1;
+                match.rank += 1;
             }
         } else {
             // normal match
             last_sequential = false;
-            rank += index.? - last_index;
+            match.rank += index.? - last_index;
         }
 
         last_index = index.?;
     }
 
-    return rank;
+    match.end = last_index;
+    return match;
 }
 
 fn sort(_: void, a: Candidate, b: Candidate) bool {

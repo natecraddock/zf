@@ -160,24 +160,31 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     terminal.clearLine();
 
     // draw the candidates
-    var i: usize = 0;
-    while (i < terminal.height) : (i += 1) {
+    var line: usize = 0;
+    while (line < terminal.height) : (line += 1) {
         terminal.lineDown();
         terminal.clearLine();
-        if (i == state.selected) {
+        if (line == state.selected) {
             terminal.sgr(7);
         } else {
             terminal.sgr(0);
         }
-        if (i < candidates.len) {
-            var str = candidates[i].str[0..std.math.min(win_size.?.x, candidates[i].str.len)];
-            try std.fmt.format(terminal.tty.writer(), "{s}\r", .{str});
+        if (line < candidates.len) {
+            const candidate = candidates[line];
+            var str = candidate.str[0..std.math.min(win_size.?.x, candidate.str.len)];
+            for (str) |c, i| {
+                if (candidate.range != null and i >= candidate.range.?.start and i <= candidate.range.?.end) {
+                    terminal.sgr(94);
+                } else terminal.sgr(39);
+                try std.fmt.format(terminal.tty.writer(), "{c}", .{c});
+            }
+            try std.fmt.format(terminal.tty.writer(), "\r", .{});
         }
-        if (i == state.selected) terminal.sgr(0);
+        if (line == state.selected) terminal.sgr(0);
     }
     terminal.sgr(0);
-    i = 0;
-    while (i < terminal.height) : (i += 1) {
+    line = 0;
+    while (line < terminal.height) : (line += 1) {
         terminal.lineUp();
     }
 
