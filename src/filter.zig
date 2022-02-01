@@ -9,10 +9,12 @@ pub const Candidate = struct {
     str: []const u8,
     name: ?[]const u8 = null,
     rank: usize = 0,
-    range: ?struct {
-        start: usize = 0,
-        end: usize = 0,
-    } = null,
+    ranges: ?[]Range = null,
+};
+
+pub const Range = struct {
+    start: usize = 0,
+    end: usize = 0,
 };
 
 pub fn contains(str: []const u8, byte: u8) bool {
@@ -136,6 +138,7 @@ pub fn rankCandidates(allocator: std.mem.Allocator, candidates: []Candidate, que
     defer allocator.free(query_tokens);
     for (candidates) |candidate| {
         var c = candidate;
+        c.ranges = try allocator.alloc(Range, query_tokens.len);
         if (rankCandidate(&c, query_tokens, smart_case)) {
             try ranked.append(c);
         }
@@ -193,8 +196,8 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
-    for (query_tokens) |token| {
-        if (rankToken(candidate, token, smart_case)) |r| {
+    for (query_tokens) |token, i| {
+        if (rankToken(candidate, &candidate.ranges.?[i], token, smart_case)) |r| {
             candidate.rank += r;
         } else return false;
     }
@@ -203,7 +206,8 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
     return true;
 }
 
-fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize {
+// TODO: pass in only candidate name & str
+fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?usize {
     // iterate over the indexes where the first char of the token matches
     var best_rank: ?usize = null;
     var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
@@ -214,7 +218,7 @@ fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize 
         if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank -| 2;
-                candidate.range = .{ .start = match.start + offs, .end = match.end + offs };
+                range.* = .{ .start = match.start + offs, .end = match.end + offs };
             }
         } else break;
     }
@@ -226,7 +230,7 @@ fn rankToken(candidate: *Candidate, token: []const u8, smart_case: bool) ?usize 
             if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
-                    candidate.range = .{ .start = match.start, .end = match.end };
+                    range.* = .{ .start = match.start, .end = match.end };
                 }
             } else break;
         }

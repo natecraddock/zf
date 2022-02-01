@@ -153,6 +153,13 @@ const State = struct {
     selected: usize,
 };
 
+fn inRange(index: usize, ranges: []filter.Range) bool {
+    for (ranges) |*range| {
+        if (index >= range.start and index <= range.end) return true;
+    }
+    return false;
+}
+
 fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
     const win_size = terminal.windowSize();
 
@@ -173,7 +180,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
             const candidate = candidates[line];
             var str = candidate.str[0..std.math.min(win_size.?.x, candidate.str.len)];
             for (str) |c, i| {
-                if (candidate.range != null and i >= candidate.range.?.start and i <= candidate.range.?.end) {
+                if (candidate.ranges != null and inRange(i, candidate.ranges.?)) {
                     terminal.sgr(94);
                 } else terminal.sgr(39);
                 try std.fmt.format(terminal.tty.writer(), "{c}", .{c});
