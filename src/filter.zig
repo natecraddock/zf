@@ -3,14 +3,20 @@ const ArrayList = std.ArrayList;
 const testing = std.testing;
 
 // public function interface for ranking a single item with the zf algorithm
-export fn rankItem(str: [*:0]const u8, tokens: [*][*:0]const u8, num_tokens: usize) c_int {
+export fn rankItem(
+    str: [*:0]const u8,
+    tokens: [*][*:0]const u8,
+    num_tokens: usize,
+    filename: bool,
+) c_int {
     const string = std.mem.span(str);
+    const name = if (filename) std.fs.path.basename(string) else string;
+    var candidate: Candidate = .{ .str = string, .name = name };
 
     var rank: c_int = 0;
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        var candidate: Candidate = .{ .str = string, .name = string };
         if (rankToken(&candidate, token, true)) |r| {
             rank += @intCast(c_int, r);
         } else return -1;
