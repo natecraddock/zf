@@ -253,7 +253,7 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case:
     var last_sequential = false;
 
     for (token) |c| {
-        const index = if (smart_case) indexOf(u8, str, last_index, c) else indexOfCaseSensitive(u8, str, last_index, c);
+        const index = if (smart_case) indexOf(u8, str, last_index + 1, c) else indexOfCaseSensitive(u8, str, last_index + 1, c);
         if (index == null) return null;
 
         if (index.? == last_index + 1) {
