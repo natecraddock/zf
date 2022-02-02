@@ -4,10 +4,12 @@ const std = @import("std");
 
 const filter = @import("filter.zig");
 const Candidate = filter.Candidate;
+const Range = filter.Range;
 
 export fn rankItem(
     str: [*:0]const u8,
     tokens: [*][*:0]const u8,
+    ranges: [*]Range,
     num_tokens: usize,
     filename: bool,
 ) c_int {
@@ -19,7 +21,7 @@ export fn rankItem(
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        if (filter.rankToken(&candidate, token, true)) |r| {
+        if (filter.rankToken(&candidate, &ranges[index], token, true)) |r| {
             rank += @intCast(c_int, r);
         } else return -1;
     }
