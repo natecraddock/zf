@@ -9,6 +9,7 @@ const filter = @import("filter.zig");
 
 pub const Terminal = struct {
     tty: File,
+    writer: File.Writer,
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
@@ -24,13 +25,12 @@ pub const Terminal = struct {
 
         raw_termios.iflag &= ~@as(u32, system.ICRNL);
         raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO | system.ISIG);
-        raw_termios.cc[system.V.MIN] = 0;
-        raw_termios.cc[system.V.TIME] = 1;
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
         return Terminal{
             .tty = tty,
+            .writer = tty.writer(),
             .termios = termios,
             .raw_termios = raw_termios,
             .max_height = max_height,
@@ -48,7 +48,7 @@ pub const Terminal = struct {
     }
 
     fn write(self: *Terminal, args: anytype) void {
-        std.fmt.format(self.tty.writer(), "\x1b[{d}{c}", args) catch unreachable;
+        self.writer.print("\x1b[{d}{c}", args) catch unreachable;
     }
 
     pub fn clearLine(self: *Terminal) void {
@@ -56,20 +56,12 @@ pub const Terminal = struct {
         self.write(.{ 2, 'K' });
     }
 
-    pub fn lineUp(self: *Terminal) void {
-        self.write(.{ 1, 'A' });
+    pub fn lineUp(self: *Terminal, num: usize) void {
+        self.write(.{ num, 'A' });
     }
 
-    pub fn lineDown(self: *Terminal) void {
-        self.write(.{ 1, 'B' });
-    }
-
-    pub fn cursorVisible(self: *Terminal, show: bool) void {
-        if (show) {
-            self.write(.{ 25, 'h' });
-        } else {
-            self.write(.{ 25, 'l' });
-        }
+    pub fn lineDown(self: *Terminal, num: usize) void {
+        self.write(.{ num, 'B' });
     }
 
     pub fn sgr(self: *Terminal, code: usize) void {
@@ -153,59 +145,57 @@ const State = struct {
     selected: usize,
 };
 
-fn inRange(index: usize, ranges: []filter.Range) bool {
+fn highlightRanges(terminal: *Terminal, index: usize, ranges: []filter.Range) void {
     for (ranges) |*range| {
-        if (index >= range.start and index <= range.end) return true;
+        if (index == range.start) {
+            terminal.sgr(94);
+            continue;
+        }
+        if (index == range.end + 1) {
+            terminal.sgr(39);
+            continue;
+        }
     }
-    return false;
 }
 
 fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
     const win_size = terminal.windowSize();
 
-    terminal.cursorVisible(false);
-    terminal.clearLine();
+    terminal.writer.print("\x1b[?25l", .{}) catch unreachable;
 
     // draw the candidates
     var line: usize = 0;
     while (line < terminal.height) : (line += 1) {
-        terminal.lineDown();
+        terminal.lineDown(1);
         terminal.clearLine();
         if (line == state.selected) {
             terminal.sgr(7);
-        } else {
-            terminal.sgr(0);
         }
         if (line < candidates.len) {
             const candidate = candidates[line];
             var str = candidate.str[0..std.math.min(win_size.?.x, candidate.str.len)];
             for (str) |c, i| {
-                if (candidate.ranges != null and inRange(i, candidate.ranges.?)) {
-                    terminal.sgr(94);
-                } else terminal.sgr(39);
-                try std.fmt.format(terminal.tty.writer(), "{c}", .{c});
+                if (candidate.ranges != null) highlightRanges(terminal, i, candidate.ranges.?);
+                terminal.writer.writeByte(c) catch unreachable;
             }
-            try std.fmt.format(terminal.tty.writer(), "\r", .{});
         }
-        if (line == state.selected) terminal.sgr(0);
+        terminal.sgr(0);
     }
     terminal.sgr(0);
-    line = 0;
-    while (line < terminal.height) : (line += 1) {
-        terminal.lineUp();
-    }
+    terminal.lineUp(terminal.height);
 
     // draw the prompt
-    try std.fmt.format(terminal.tty.writer(), "> {s}\r", .{query.items});
+    terminal.clearLine();
+    try terminal.writer.print("{s}\r", .{query.items});
 
     // move cursor by drawing chars
-    _ = try terminal.tty.writer().write("> ");
+    _ = try terminal.writer.write("> ");
     for (query.items) |c, index| {
         if (index == state.cursor) break;
-        _ = try terminal.tty.writer().writeByte(c);
+        _ = try terminal.writer.writeByte(c);
     }
 
-    terminal.cursorVisible(true);
+    terminal.writer.print("\x1b[?25h", .{}) catch unreachable;
 }
 
 fn ctrl(comptime key: u8) u8 {
@@ -231,17 +221,11 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
         .selected = 0,
     };
 
-    // ensure enough room to draw all `num_rows` lines of output by drawing blank lines
-    // effectively scrolling the view
+    // ensure enough room to draw all `num_rows` lines of output by drawing
+    // blank lines, effectively scrolling the view
     terminal.determineHeight();
-    {
-        var i: usize = 0;
-        while (i < terminal.height) : (i += 1) {
-            _ = try terminal.tty.writer().write("\n");
-        }
-        i = 0;
-        while (i < terminal.height) : (i += 1) terminal.lineUp();
-    }
+    terminal.lineDown(terminal.height);
+    terminal.lineUp(terminal.height);
 
     var filtered = candidates;
 
@@ -359,11 +343,8 @@ pub fn cleanUp(terminal: *Terminal) !void {
     var i: usize = 0;
     while (i < terminal.height) : (i += 1) {
         terminal.clearLine();
-        terminal.lineDown();
+        terminal.lineDown(1);
     }
     terminal.clearLine();
-    i = 0;
-    while (i < terminal.height) : (i += 1) {
-        terminal.lineUp();
-    }
+    terminal.lineUp(terminal.height);
 }
