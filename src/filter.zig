@@ -207,7 +207,7 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
 }
 
 // TODO: pass in only candidate name & str
-fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?usize {
+pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?usize {
     // iterate over the indexes where the first char of the token matches
     var best_rank: ?usize = null;
     var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
