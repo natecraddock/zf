@@ -68,7 +68,14 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
+#### 0.2
+* neovim telescope plugin integration
+* match highlights
+
+#### 0.3
+* improve ranking algorithm
+* improve testing
 * tidy code
-* write neovim telescope sorter extension
+
+#### 0.4
 * unicode support
-* release version 1.0
