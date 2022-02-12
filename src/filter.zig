@@ -8,7 +8,7 @@ const testing = std.testing;
 pub const Candidate = struct {
     str: []const u8,
     name: ?[]const u8 = null,
-    rank: usize = 0,
+    rank: f64 = 0,
     ranges: ?[]Range = null,
 };
 
@@ -207,24 +207,26 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
 }
 
 // TODO: pass in only candidate name & str
-pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?usize {
+pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?f64 {
     // iterate over the indexes where the first char of the token matches
-    var best_rank: ?usize = null;
+    var best_rank: ?f64 = null;
     var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
 
-    // TODO: rank better for name matches
     const offs = candidate.str.len - candidate.name.?.len;
     while (it.next()) |start_index| {
         if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
-                best_rank = match.rank -| 2;
+                best_rank = match.rank;
                 range.* = .{ .start = match.start + offs, .end = match.end + offs };
             }
         } else break;
     }
 
     // retry on the full string
-    if (best_rank == null) {
+    if (best_rank != null) {
+        // was a filename match, give priority
+        best_rank.? /= 2.0;
+    } else {
         it = IndexIterator.init(candidate.str, token[0], smart_case);
         while (it.next()) |start_index| {
             if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |match| {
@@ -240,10 +242,17 @@ pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_
 }
 
 const Match = struct {
-    rank: usize,
+    rank: f64,
     start: usize,
     end: usize,
 };
+
+inline fn isStartOfWord(byte: u8) bool {
+    return switch (byte) {
+        std.fs.path.sep, '_', '-', '.', ' ' => true,
+        else => false,
+    };
+}
 
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
@@ -251,6 +260,11 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case:
     var match: Match = .{ .rank = 1, .start = start_index, .end = 0 };
     var last_index = start_index;
     var last_sequential = false;
+
+    // penalty for not starting on a word boundary
+    if (start_index > 0 and !isStartOfWord(str[start_index - 1])) {
+        match.rank += 2.0;
+    }
 
     for (token) |c| {
         const index = if (smart_case) indexOf(u8, str, last_index + 1, c) else indexOfCaseSensitive(u8, str, last_index + 1, c);
@@ -260,12 +274,17 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case:
             // sequential matches only count the first character
             if (!last_sequential) {
                 last_sequential = true;
-                match.rank += 1;
+                match.rank += 1.0;
             }
         } else {
+            // penalty for not starting on a word boundary
+            if (!isStartOfWord(str[index.? - 1])) {
+                match.rank += 2.0;
+            }
+
             // normal match
             last_sequential = false;
-            match.rank += index.? - last_index;
+            match.rank += @intToFloat(f64, index.? - last_index);
         }
 
         last_index = index.?;
