@@ -203,7 +203,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
 
     // draw the prompt
     terminal.clearLine();
-    try terminal.writer.print("{s}\r", .{query.items});
+    try terminal.writer.print("> {s}\r", .{query.items});
 
     // move cursor by drawing chars
     _ = try terminal.writer.write("> ");
