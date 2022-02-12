@@ -61,6 +61,13 @@ pub const Terminal = struct {
         self.write(.{ 2, 'K' });
     }
 
+    pub fn scrollUp(self: *Terminal, num: usize) void {
+        var i: usize = 0;
+        while (i < num) : (i += 1) {
+            _ = self.writer.write("\n") catch unreachable;
+        }
+    }
+
     pub fn lineUp(self: *Terminal, num: usize) void {
         self.write(.{ num, 'A' });
     }
@@ -231,10 +238,10 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
         .selected = 0,
     };
 
-    // ensure enough room to draw all `num_rows` lines of output by drawing
-    // blank lines, effectively scrolling the view
+    // ensure enough room to draw all lines of output by drawing blank lines,
+    // effectively scrolling the view. + 1 to also include the prompt's offset
     terminal.determineHeight();
-    terminal.lineDown(terminal.height);
+    terminal.scrollUp(terminal.height);
     terminal.lineUp(terminal.height);
 
     var filtered = candidates;
