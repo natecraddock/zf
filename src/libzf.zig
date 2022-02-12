@@ -12,18 +12,18 @@ export fn rankItem(
     ranges: [*]Range,
     num_tokens: usize,
     filename: bool,
-) c_int {
+) f64 {
     const string = std.mem.span(str);
     const name = if (filename) std.fs.path.basename(string) else string;
     var candidate: Candidate = .{ .str = string, .name = name };
 
-    var rank: c_int = 0;
+    var rank: f64 = 0;
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
         if (filter.rankToken(&candidate, &ranges[index], token, true)) |r| {
-            rank += @intCast(c_int, r);
-        } else return -1;
+            rank += r;
+        } else return -1.0;
     }
 
     return rank;
