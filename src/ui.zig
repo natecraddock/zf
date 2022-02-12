@@ -98,15 +98,17 @@ const Key = union(enum) {
     none,
 };
 
-fn readKey(file: std.fs.File) Key {
+fn readKey(terminal: *Terminal) Key {
+    const reader = terminal.tty.reader();
+
     // reading may fail (timeout)
-    var byte = file.reader().readByte() catch return .none;
+    var byte = reader.readByte() catch return .none;
 
     // escape
     if (byte == '\x1b') {
         var seq: [2]u8 = undefined;
-        seq[0] = file.reader().readByte() catch return .esc;
-        seq[1] = file.reader().readByte() catch return .esc;
+        seq[0] = reader.readByte() catch return .esc;
+        seq[1] = reader.readByte() catch return .esc;
 
         if (seq[0] == '[') {
             return switch (seq[1]) {
@@ -254,7 +256,7 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
 
         const visible_rows = std.math.min(terminal.height, filtered.len);
 
-        var key = readKey(terminal.tty);
+        var key = readKey(terminal);
         switch (key) {
             .character => |byte| {
                 try query.insert(state.cursor, byte);
