@@ -21,8 +21,18 @@ or io redirection.
 ## Why zf over fzf, fzy, selecta, pick, etc?
 
 I created zf to solve a problem I found in all of the fuzzy finders I tried:
-none prioritized matches on filenames. Because the filenames in a tree are
-typically unique, zf ranks matches on filenames higher.
+none prioritized matches on filenames.
+
+I [analyzed
+filenames](https://nathancraddock.com/blog/in-search-of-a-better-finder/) from
+over 50 git repositories and discovered that the majority of filenames are
+unique in a given project. I used that knowledge in designing zf's ranking
+algorithm to make a fuzzy-finder optimized for filtering filepaths.
+
+* Matches on filenames are prioritized over filepath matches
+* Matches on the beginning of a word are prioritized over matches in the middle
+  of a word
+* Non-sequential character matches are penalized
 
 zf also treats the query string as a sequence of space-separated tokens. This
 allows for faster filtering when filenames are not unique.
@@ -31,18 +41,18 @@ Imagine searching for an `__init__.py` file in a Python project.
 
 ```text
 > init
-./zygrader/__init__.py
-./zygrader/ui/__init__.py
-./zygrader/data/__init__.py
-./zygrader/config/__init__.py
+./__init__.py
+./ui/__init__.py
+./data/__init__.py
+./config/__init__.py
 ```
 
 At this point you can either move the selection down with `c-n` to find
-`config/__init__.py`, or you can add a new token to the query string.
+`./config/__init__.py`, or you can add a new token to the query string.
 
 ```text
 > init c
-./zygrader/config/__init__.py
+./config/__init__.py
 ```
 
 Treating the query string as a sequence of tokens makes filtering more
