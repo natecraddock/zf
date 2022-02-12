@@ -37,6 +37,11 @@ pub const Terminal = struct {
         };
     }
 
+    pub fn nodelay(self: *Terminal, state: bool) void {
+        self.raw_termios.cc[system.V.MIN] = if (state) 0 else 1;
+        std.os.tcsetattr(self.tty.handle, .NOW, self.raw_termios) catch unreachable;
+    }
+
     pub fn deinit(self: *Terminal) void {
         std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
@@ -106,6 +111,9 @@ fn readKey(terminal: *Terminal) Key {
 
     // escape
     if (byte == '\x1b') {
+        terminal.nodelay(true);
+        defer terminal.nodelay(false);
+
         var seq: [2]u8 = undefined;
         seq[0] = reader.readByte() catch return .esc;
         seq[1] = reader.readByte() catch return .esc;
