@@ -78,14 +78,11 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-#### 0.2
-* neovim telescope plugin integration
-* match highlights
-
 #### 0.3
 * improve ranking algorithm
 * improve testing
 * tidy code
+* ship binaries with releases
 
 #### 0.4
 * unicode support
