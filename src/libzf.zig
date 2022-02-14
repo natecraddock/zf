@@ -12,6 +12,7 @@ export fn rankItem(
     ranges: [*]Range,
     num_tokens: usize,
     filename: bool,
+    case_sensitive: bool,
 ) f64 {
     const string = std.mem.span(str);
     const name = if (filename) std.fs.path.basename(string) else string;
@@ -21,7 +22,7 @@ export fn rankItem(
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        if (filter.rankToken(&candidate, &ranges[index], token, true)) |r| {
+        if (filter.rankToken(&candidate, &ranges[index], token, !case_sensitive)) |r| {
             rank += r;
         } else return -1.0;
     }
