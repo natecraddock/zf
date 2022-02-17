@@ -14,17 +14,19 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 const help =
     \\Usage: zf [options]
     \\
-    \\-f, --filter  Skip interactive use and filter using the given query
-    \\-l, --lines   Set the maximum number of result lines to show (default 10)
-    \\-v, --version Show version information and exit
-    \\-h, --help    Display this help and exit
+    \\-f, --filter     Skip interactive use and filter using the given query
+    \\-k, --keep-order Don't sort by rank and preserve order of lines read on stdin
+    \\-l, --lines      Set the maximum number of result lines to show (default 10)
+    \\-v, --version    Show version information and exit
+    \\-h, --help       Display this help and exit
 ;
 
 const Config = struct {
     help: bool = false,
     version: bool = false,
-    lines: usize = 10,
     skip_ui: bool = false,
+    keep_order: bool = false,
+    lines: usize = 10,
     query: []u8 = undefined,
 
     // HACK: error unions cannot return a value, so return error messages in
@@ -52,6 +54,8 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
         } else if (eql(u8, arg, "-v") or eql(u8, arg, "--version")) {
             config.version = true;
             return config;
+        } else if (eql(u8, arg, "-k") or eql(u8, arg, "--keep-order")) {
+            config.keep_order = true;
         } else if (eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
             if (index + 1 > args.len - 1) {
                 config.err = true;
@@ -136,6 +140,18 @@ test "parse args" {
         const expected: Config = .{ .lines = 12 };
         try testing.expectEqual(expected, config);
     }
+    {
+        const args = [_][]const u8{ "zf", "-k" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .keep_order = true };
+        try testing.expectEqual(expected, config);
+    }
+    {
+        const args = [_][]const u8{ "zf", "--keep-order" };
+        const config = try parseArgs(testing.allocator, &args);
+        const expected: Config = .{ .keep_order = true };
+        try testing.expectEqual(expected, config);
+    }
 
     // failure cases
     {
@@ -201,14 +217,14 @@ pub fn main() anyerror!void {
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.skip_ui) {
-        const filtered = try filter.rankCandidates(allocator, candidates, config.query);
+        const filtered = try filter.rankCandidates(allocator, candidates, config.query, config.keep_order);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});
         }
     } else {
         var terminal = try ui.Terminal.init(@minimum(candidates.len, config.lines));
-        var selected = try ui.run(allocator, &terminal, candidates);
+        var selected = try ui.run(allocator, &terminal, candidates, config.keep_order);
         try ui.cleanUp(&terminal);
         terminal.deinit();
 

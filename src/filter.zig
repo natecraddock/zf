@@ -123,7 +123,12 @@ fn hasUpper(query: []const u8) bool {
 ///
 /// returns a sorted slice of Candidates that match the query ready for display
 /// in a tui or output to stdout
-pub fn rankCandidates(allocator: std.mem.Allocator, candidates: []Candidate, query: []const u8) ![]Candidate {
+pub fn rankCandidates(
+    allocator: std.mem.Allocator,
+    candidates: []Candidate,
+    query: []const u8,
+    keep_order: bool,
+) ![]Candidate {
     var ranked = ArrayList(Candidate).init(allocator);
     const smart_case = !hasUpper(query);
 
@@ -144,7 +149,9 @@ pub fn rankCandidates(allocator: std.mem.Allocator, candidates: []Candidate, que
         }
     }
 
-    std.sort.sort(Candidate, ranked.items, {}, sort);
+    if (!keep_order) {
+        std.sort.sort(Candidate, ranked.items, {}, sort);
+    }
 
     return ranked.toOwnedSlice();
 }

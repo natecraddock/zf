@@ -229,7 +229,12 @@ fn charOrNull(char: u8) ?u8 {
     return null;
 }
 
-pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Candidate) !?ArrayList(u8) {
+pub fn run(
+    allocator: std.mem.Allocator,
+    terminal: *Terminal,
+    candidates: []Candidate,
+    keep_order: bool,
+) !?ArrayList(u8) {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -257,7 +262,7 @@ pub fn run(allocator: std.mem.Allocator, terminal: *Terminal, candidates: []Cand
             old_query = try allocator.alloc(u8, query.items.len);
             std.mem.copy(u8, old_query, query.items);
 
-            filtered = try filter.rankCandidates(allocator, candidates, query.items);
+            filtered = try filter.rankCandidates(allocator, candidates, query.items, keep_order);
             redraw = true;
             state.selected = 0;
         }
