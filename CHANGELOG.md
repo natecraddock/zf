@@ -7,6 +7,11 @@
   Adds an option to skip sorting of items and preserve the order of lines read
   on stdin.
 
+* **feat**: add plain text option ('-p' '--plain')
+
+  Adds an option to skip the filename match prioritization. Useful when the
+  lines are not filepaths.
+
 * **feat**: expose case-sensitive matching in libzf
 
   Update to the zf algorithm to make matching more precise. Matches on the
