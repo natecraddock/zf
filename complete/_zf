@@ -1,0 +1,18 @@
+#compdef zf
+
+# zsh completion script for zf
+# inspired by https://blog.kloetzl.info/how-to-write-a-zsh-completion/
+
+_zf() {
+    local -a args
+    args+=(
+        "(- *)"{-v,--version}"[Show version information and exit]"
+        "(- *)"{-h,--help}"[Display this help and exit]"
+        "(-f --filter)"{-f,--filter}"[Skip interactive use and filter using the given query]:string:"
+        "(-k --keep-order)"{-k,--keep-order}"[Don't sort by rank and preserve order of lines read on stdin]"
+        "(-l --lines)"{-l,--lines}"[Set the maximum number of result lines to show (default 10)]:int:"
+    )
+    _arguments $args[@]
+}
+
+_zf
