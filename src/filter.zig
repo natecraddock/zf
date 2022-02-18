@@ -204,7 +204,7 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
     for (query_tokens) |token, i| {
-        if (rankToken(candidate, &candidate.ranges.?[i], token, smart_case)) |r| {
+        if (rankToken(candidate.str, candidate.name, &candidate.ranges.?[i], token, smart_case)) |r| {
             candidate.rank += r;
         } else return false;
     }
@@ -213,15 +213,20 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
     return true;
 }
 
-// TODO: pass in only candidate name & str
-pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_case: bool) ?f64 {
+pub fn rankToken(
+    str: []const u8,
+    name: ?[]const u8,
+    range: *Range,
+    token: []const u8,
+    smart_case: bool,
+) ?f64 {
     // iterate over the indexes where the first char of the token matches
     var best_rank: ?f64 = null;
-    var it = IndexIterator.init(candidate.name.?, token[0], smart_case);
+    var it = IndexIterator.init(name.?, token[0], smart_case);
 
-    const offs = candidate.str.len - candidate.name.?.len;
+    const offs = str.len - name.?.len;
     while (it.next()) |start_index| {
-        if (scanToEnd(candidate.name.?, token[1..], start_index, smart_case)) |match| {
+        if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
                 range.* = .{ .start = match.start + offs, .end = match.end + offs };
@@ -234,9 +239,9 @@ pub fn rankToken(candidate: *Candidate, range: *Range, token: []const u8, smart_
         // was a filename match, give priority
         best_rank.? /= 2.0;
     } else {
-        it = IndexIterator.init(candidate.str, token[0], smart_case);
+        it = IndexIterator.init(str, token[0], smart_case);
         while (it.next()) |start_index| {
-            if (scanToEnd(candidate.str, token[1..], start_index, smart_case)) |match| {
+            if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                     range.* = .{ .start = match.start, .end = match.end };
