@@ -228,9 +228,8 @@ pub fn main() anyerror!void {
         try ui.cleanUp(&terminal);
         terminal.deinit();
 
-        if (selected) |result| {
-            defer result.deinit();
-            try stdout.print("{s}\n", .{result.items});
+        if (selected) |str| {
+            try stdout.print("{s}\n", .{str});
         } else std.process.exit(1);
     }
 }

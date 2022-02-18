@@ -234,7 +234,7 @@ pub fn run(
     terminal: *Terminal,
     candidates: []Candidate,
     keep_order: bool,
-) !?ArrayList(u8) {
+) !?[]const u8 {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
@@ -347,10 +347,7 @@ pub fn run(
             },
             .enter => {
                 if (filtered.len == 0) break;
-
-                var selected = ArrayList(u8).init(allocator);
-                try selected.appendSlice(filtered[state.selected].str);
-                return selected;
+                return filtered[state.selected].str;
             },
             .esc => break,
             .none => {},
