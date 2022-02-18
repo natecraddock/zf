@@ -1,5 +1,28 @@
 # master
 
+* **feat**: prioritize matches on beginning of words
+
+* **feat**: add keep order option (`-k` `--keep-order`)
+
+  Adds an option to skip sorting of items and preserve the order of lines read
+  on stdin.
+
+* **feat**: expose case-sensitive matching in libzf
+
+  Update to the zf algorithm to make matching more precise. Matches on the
+  beginning of words are ranked higher.
+
+* **extra**: add shell completions for bash, zsh, and fish
+
+* **fix**: query mangling when moving the cursor left or right
+
+* **fix**: off-by-one scolling error at bottom of terminals
+
+  When zf was run at the bottom of a terminal the scrolling would remove the
+  previous prompt.
+
+* **fix**: don't require pressing esc three times to cancel
+
 # v0.2
 
 This release fixes a few minor bugs, optimizes drawing the terminal user
