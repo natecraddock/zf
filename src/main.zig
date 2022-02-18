@@ -17,6 +17,7 @@ const help =
     \\-f, --filter     Skip interactive use and filter using the given query
     \\-k, --keep-order Don't sort by rank and preserve order of lines read on stdin
     \\-l, --lines      Set the maximum number of result lines to show (default 10)
+    \\-p, --plain      Disable filename match prioritization
     \\-v, --version    Show version information and exit
     \\-h, --help       Display this help and exit
 ;
@@ -27,6 +28,7 @@ const Config = struct {
     skip_ui: bool = false,
     keep_order: bool = false,
     lines: usize = 10,
+    plain: bool = false,
     query: []u8 = undefined,
 
     // HACK: error unions cannot return a value, so return error messages in
@@ -56,6 +58,8 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
             return config;
         } else if (eql(u8, arg, "-k") or eql(u8, arg, "--keep-order")) {
             config.keep_order = true;
+        } else if (eql(u8, arg, "-p") or eql(u8, arg, "--plain")) {
+            config.plain = true;
         } else if (eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
             if (index + 1 > args.len - 1) {
                 config.err = true;
@@ -141,15 +145,15 @@ test "parse args" {
         try testing.expectEqual(expected, config);
     }
     {
-        const args = [_][]const u8{ "zf", "-k" };
+        const args = [_][]const u8{ "zf", "-k", "-p" };
         const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .keep_order = true };
+        const expected: Config = .{ .keep_order = true, .plain = true };
         try testing.expectEqual(expected, config);
     }
     {
-        const args = [_][]const u8{ "zf", "--keep-order" };
+        const args = [_][]const u8{ "zf", "--keep-order", "--plain" };
         const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .keep_order = true };
+        const expected: Config = .{ .keep_order = true, .plain = true };
         try testing.expectEqual(expected, config);
     }
 
@@ -213,7 +217,7 @@ pub fn main() anyerror!void {
     const buf = try readAll(allocator, &stdin);
 
     const delimiter = '\n';
-    var candidates = try filter.collectCandidates(allocator, buf, delimiter);
+    var candidates = try filter.collectCandidates(allocator, buf, delimiter, config.plain);
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.skip_ui) {

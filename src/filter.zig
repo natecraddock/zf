@@ -45,7 +45,7 @@ test "is path" {
 }
 
 /// read the candidates from the buffer
-pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]Candidate {
+pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8, plain: bool) ![]Candidate {
     var candidates = ArrayList(Candidate).init(allocator);
 
     // find delimiters
@@ -65,12 +65,8 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
         try candidates.append(.{ .str = buf[start..] });
     }
 
-    // determine if these candidates are filepaths
-    // const end = candidates.items.len - 1;
-    // const filename_match = isPath(candidates.items[0].str) or isPath(candidates.items[end].str) or isPath(candidates.items[end / 2].str);
-    const filename_match = true;
-
-    if (filename_match) {
+    // extract filepaths
+    if (!plain) {
         for (candidates.items) |*candidate| {
             candidate.name = std.fs.path.basename(candidate.str);
         }
