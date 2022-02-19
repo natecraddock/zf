@@ -2,6 +2,16 @@
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
+## Features
+
+* zf ranks matches on filenames higher than matches on the complete path
+* each whitespace-delimited query term is used separately to refine search
+  results
+* simple TUI interface that highlights matched ranges in results
+* smartcase: when the query contains no uppercase letters case-insensitive
+  matching is used
+* `libzf` library for integration with other projects
+
 ## Installation
 
 ### Arch Linux
