@@ -1,6 +1,15 @@
 # master
 
+# 0.3
+
+This release improves the ranking algorithm, adds two new commandline options,
+fixes a few bugs, and optimizes the TUI drawing code. Shell completion scripts
+are now provided for bash, zsh, and fish.
+
 * **feat**: prioritize matches on beginning of words
+
+  Matches that begin at the start of a word will be ranked higher than matches
+  in the middle of a word.
 
 * **feat**: add keep order option (`-k` `--keep-order`)
 
@@ -21,14 +30,14 @@
 
 * **fix**: query mangling when moving the cursor left or right
 
-* **fix**: off-by-one scolling error at bottom of terminals
+* **fix**: off-by-one scrolling error at bottom of terminals
 
   When zf was run at the bottom of a terminal the scrolling would remove the
   previous prompt.
 
 * **fix**: don't require pressing esc three times to cancel
 
-# v0.2
+# 0.2
 
 This release fixes a few minor bugs, optimizes drawing the terminal user
 interface, and introduces a number of new features:
@@ -60,6 +69,6 @@ interface, and introduces a number of new features:
   Allows controlling the number of displayed result lines in the terminal user
   interface.
 
-# v0.0.1
+# 0.0.1
 
 Initial release
