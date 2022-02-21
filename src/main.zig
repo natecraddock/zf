@@ -8,7 +8,7 @@ const ArrayList = std.ArrayList;
 const filter = @import("filter.zig");
 const ui = @import("ui.zig");
 
-const version = "0.3";
+const version = "0.4-dev";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =

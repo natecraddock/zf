@@ -88,11 +88,19 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-#### 0.3
-* improve ranking algorithm
-* improve testing
-* tidy code
-* ship binaries with releases
-
 #### 0.4
+* further improvements to ranking
+* improve testing
+* utf-8 support
+
+#### 0.5
 * unicode support
+* macos support
+
+#### 1.0
+* stabilized ranking algorithm
+
+  I want to give the zf algorithm some time to settle and get feedback from any
+  who use zf before reaching a stable 1.0. Any versions before 1.0 should be
+  considered stable in *behavior*, so there isn't any reason to avoid using zf
+  before 1.0.
