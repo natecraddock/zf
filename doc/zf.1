@@ -1,4 +1,4 @@
-.TH ZF 1 "2022-01-12" "zf 0.0.1"
+.TH ZF 1 "2022-01-12" "zf 0.3"
 
 .SH NAME
 zf -\ a commandline fuzzy finder that prioritizes matches on filenames
@@ -13,6 +13,12 @@ filenames.
 zf reads a list of newline separated strings on stdin and displays an
 interactive interface. Pressing enter outputs the selected line on stdout. Text
 may be entered to filter the list of strings.
+
+Each whitespace-separated term in the query string is used separately to narrow
+down the search results. For example, searching for "init config" will select
+all results that match both "init" and "config".
+
+Matching is case insensitive unless an uppercase letter is found in the query.
 
 .SH OPTIONS
 .TP
