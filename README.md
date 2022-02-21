@@ -2,6 +2,8 @@
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
+![zf](https://user-images.githubusercontent.com/7967463/155037380-79f61539-7d20-471b-8040-6ee7d0e4b6ea.gif)
+
 ## Features
 
 * zf ranks matches on filenames higher than matches on the complete path
@@ -94,7 +96,6 @@ day-to-day fuzzy finding!
 * utf-8 support
 
 #### 0.5
-* unicode support
 * macos support
 
 #### 1.0
