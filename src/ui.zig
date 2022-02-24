@@ -7,6 +7,15 @@ const File = std.fs.File;
 
 const filter = @import("filter.zig");
 
+// Select Graphic Rendition (SGR) attributes
+const Attribute = enum(u8) {
+    RESET = 0,
+    REVERSE = 7,
+
+    FG_CYAN = 36,
+    FG_DEFAULT = 39,
+};
+
 pub const Terminal = struct {
     tty: File,
     writer: File.Writer,
@@ -76,8 +85,8 @@ pub const Terminal = struct {
         self.write(.{ num, 'B' });
     }
 
-    pub fn sgr(self: *Terminal, code: usize) void {
-        self.write(.{ code, 'm' });
+    pub fn sgr(self: *Terminal, code: Attribute) void {
+        self.write(.{ @enumToInt(code), 'm' });
     }
 
     const WinSize = struct {
@@ -162,11 +171,11 @@ const State = struct {
 fn highlightRanges(terminal: *Terminal, index: usize, ranges: []filter.Range) void {
     for (ranges) |*range| {
         if (index == range.start) {
-            terminal.sgr(94);
+            terminal.sgr(.FG_CYAN);
             continue;
         }
         if (index == range.end + 1) {
-            terminal.sgr(39);
+            terminal.sgr(.FG_DEFAULT);
             continue;
         }
     }
@@ -183,7 +192,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
         terminal.lineDown(1);
         terminal.clearLine();
         if (line == state.selected) {
-            terminal.sgr(7);
+            terminal.sgr(.REVERSE);
         }
         if (line < candidates.len) {
             const candidate = candidates[line];
@@ -193,9 +202,9 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
                 terminal.writer.writeByte(c) catch unreachable;
             }
         }
-        terminal.sgr(0);
+        terminal.sgr(.RESET);
     }
-    terminal.sgr(0);
+    terminal.sgr(.RESET);
     terminal.lineUp(terminal.height);
 
     // draw the prompt
