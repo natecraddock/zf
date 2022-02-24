@@ -172,37 +172,33 @@ fn highlightRanges(terminal: *Terminal, index: usize, ranges: []filter.Range) vo
     for (ranges) |*range| {
         if (index == range.start) {
             terminal.sgr(.FG_CYAN);
-            continue;
-        }
-        if (index == range.end + 1) {
+        } else if (index == range.end + 1) {
             terminal.sgr(.FG_DEFAULT);
-            continue;
         }
     }
 }
 
-fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
-    const win_size = terminal.windowSize();
+inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize, selected: bool) void {
+    if (selected) terminal.sgr(.REVERSE);
 
-    terminal.writer.print("\x1b[?25l", .{}) catch unreachable;
+    var str = candidate.str[0..std.math.min(width, candidate.str.len)];
+    for (str) |c, i| {
+        if (candidate.ranges != null) highlightRanges(terminal, i, candidate.ranges.?);
+        terminal.writer.writeByte(c) catch unreachable;
+    }
+
+    terminal.sgr(.RESET);
+}
+
+fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
+    const width = terminal.windowSize().?.x;
 
     // draw the candidates
     var line: usize = 0;
     while (line < terminal.height) : (line += 1) {
         terminal.lineDown(1);
         terminal.clearLine();
-        if (line == state.selected) {
-            terminal.sgr(.REVERSE);
-        }
-        if (line < candidates.len) {
-            const candidate = candidates[line];
-            var str = candidate.str[0..std.math.min(win_size.?.x, candidate.str.len)];
-            for (str) |c, i| {
-                if (candidate.ranges != null) highlightRanges(terminal, i, candidate.ranges.?);
-                terminal.writer.writeByte(c) catch unreachable;
-            }
-        }
-        terminal.sgr(.RESET);
+        if (line < candidates.len) drawCandidate(terminal, candidates[line], width, line == state.selected);
     }
     terminal.sgr(.RESET);
     terminal.lineUp(terminal.height);
@@ -217,8 +213,6 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
         if (index == state.cursor) break;
         _ = try terminal.writer.writeByte(c);
     }
-
-    terminal.writer.print("\x1b[?25h", .{}) catch unreachable;
 }
 
 fn ctrl(comptime key: u8) u8 {
