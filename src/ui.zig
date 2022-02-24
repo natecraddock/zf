@@ -215,8 +215,52 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     }
 }
 
+const Action = union(enum) {
+    byte: u8,
+    line_up,
+    line_down,
+    cursor_left,
+    cursor_right,
+    backspace,
+    delete,
+    delete_word,
+    delete_line,
+    select,
+    close,
+    pass,
+};
+
 fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
+}
+
+// TODO: for some reason this needs to be extracted to a separate function,
+// perhaps related to ziglang/zig#137
+fn ctrlToAction(key: u8) Action {
+    return switch (key) {
+        ctrl('c') => .close,
+        ctrl('w') => .delete_word,
+        ctrl('u') => .delete_line,
+        ctrl('p') => .line_up,
+        ctrl('n') => .line_down,
+        else => .pass,
+    };
+}
+
+fn keyToAction(key: Key) Action {
+    return switch (key) {
+        .character => |c| .{ .byte = c },
+        .control => |c| ctrlToAction(c),
+        .backspace => .backspace,
+        .delete => .delete,
+        .up => .line_up,
+        .down => .line_down,
+        .left => .cursor_left,
+        .right => .cursor_right,
+        .enter => .select,
+        .esc => .close,
+        .none => .pass,
+    };
 }
 
 fn charOrNull(char: u8) ?u8 {
@@ -227,6 +271,25 @@ fn charOrNull(char: u8) ?u8 {
         return word_chars[i];
     }
     return null;
+}
+
+fn actionDeleteWord(query: *ArrayList(u8), cursor: *usize) void {
+    if (cursor.* > 0) {
+        const first_sep = charOrNull(query.items[cursor.* - 1]);
+        while (first_sep != null and cursor.* > 0 and first_sep.? == query.items[cursor.* - 1]) {
+            _ = query.pop();
+            cursor.* -= 1;
+        }
+        while (cursor.* > 0) {
+            _ = query.pop();
+            cursor.* -= 1;
+            if (cursor.* == 0) break;
+
+            const sep = charOrNull(query.items[cursor.* - 1]);
+            if (first_sep == null and sep != null) break;
+            if (first_sep != null and sep != null and first_sep.? == sep.?) break;
+        }
+    }
 }
 
 pub fn run(
@@ -276,47 +339,17 @@ pub fn run(
 
         const visible_rows = std.math.min(terminal.height, filtered.len);
 
-        var key = readKey(terminal);
-        switch (key) {
-            .character => |byte| {
-                try query.insert(state.cursor, byte);
+        const action = keyToAction(readKey(terminal));
+        switch (action) {
+            .byte => |b| {
+                try query.insert(state.cursor, b);
                 state.cursor += 1;
             },
-            .control => |byte| {
-                switch (byte) {
-                    // handle ctrl-c here rather than signals to allow for proper cleanup
-                    ctrl('c') => break,
-                    ctrl('w') => {
-                        if (state.cursor > 0) {
-                            const first_sep = charOrNull(query.items[state.cursor - 1]);
-                            while (first_sep != null and state.cursor > 0 and first_sep.? == query.items[state.cursor - 1]) {
-                                _ = query.pop();
-                                state.cursor -= 1;
-                            }
-                            while (state.cursor > 0) {
-                                _ = query.pop();
-                                state.cursor -= 1;
-                                if (state.cursor == 0) break;
-
-                                const sep = charOrNull(query.items[state.cursor - 1]);
-                                if (first_sep == null and sep != null) break;
-                                if (first_sep != null and sep != null and first_sep.? == sep.?) break;
-                            }
-                        }
-                    },
-                    ctrl('u') => {
-                        while (state.cursor > 0) {
-                            _ = query.orderedRemove(state.cursor - 1);
-                            state.cursor -= 1;
-                        }
-                    },
-                    ctrl('p') => if (state.selected > 0) {
-                        state.selected -= 1;
-                    },
-                    ctrl('n') => if (state.selected < visible_rows - 1) {
-                        state.selected += 1;
-                    },
-                    else => {},
+            .delete_word => actionDeleteWord(&query, &state.cursor),
+            .delete_line => {
+                while (state.cursor > 0) {
+                    _ = query.orderedRemove(state.cursor - 1);
+                    state.cursor -= 1;
                 }
             },
             .backspace => {
@@ -333,24 +366,24 @@ pub fn run(
                     _ = query.orderedRemove(state.cursor);
                 }
             },
-            .up => if (state.selected > 0) {
+            .line_up => if (state.selected > 0) {
                 state.selected -= 1;
             },
-            .down => if (state.selected < visible_rows - 1) {
+            .line_down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
             },
-            .left => if (state.cursor > 0) {
+            .cursor_left => if (state.cursor > 0) {
                 state.cursor -= 1;
             },
-            .right => if (state.cursor < query.items.len) {
+            .cursor_right => if (state.cursor < query.items.len) {
                 state.cursor += 1;
             },
-            .enter => {
+            .select => {
                 if (filtered.len == 0) break;
                 return filtered[state.selected].str;
             },
-            .esc => break,
-            .none => {},
+            .close => break,
+            .pass => {},
         }
     }
 
@@ -358,7 +391,6 @@ pub fn run(
 }
 
 pub fn cleanUp(terminal: *Terminal) !void {
-    // offset to handle prompt line
     var i: usize = 0;
     while (i < terminal.height) : (i += 1) {
         terminal.clearLine();
