@@ -61,7 +61,7 @@ pub const Terminal = struct {
         self.write(.{ 2, 'K' });
     }
 
-    pub fn scrollUp(self: *Terminal, num: usize) void {
+    pub fn scrollDown(self: *Terminal, num: usize) void {
         var i: usize = 0;
         while (i < num) : (i += 1) {
             _ = self.writer.write("\n") catch unreachable;
@@ -154,9 +154,6 @@ fn readKey(terminal: *Terminal) Key {
     return .none;
 }
 
-// the number of rows of output
-const num_rows: usize = 10;
-
 const State = struct {
     cursor: usize,
     selected: usize,
@@ -246,7 +243,7 @@ pub fn run(
     // ensure enough room to draw all lines of output by drawing blank lines,
     // effectively scrolling the view. + 1 to also include the prompt's offset
     terminal.determineHeight();
-    terminal.scrollUp(terminal.height);
+    terminal.scrollDown(terminal.height);
     terminal.lineUp(terminal.height);
 
     var filtered = candidates;

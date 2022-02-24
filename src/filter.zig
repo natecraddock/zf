@@ -17,33 +17,6 @@ pub const Range = struct {
     end: usize = 0,
 };
 
-pub fn contains(str: []const u8, byte: u8) bool {
-    for (str) |b| {
-        if (b == byte) return true;
-    }
-    return false;
-}
-
-/// if a string contains either a separator or a . character, then we assume it is a filepath
-fn isPath(str: []const u8) bool {
-    if (contains(str, std.fs.path.sep)) return true;
-    if (contains(str, '.')) return true;
-    return false;
-}
-
-test "is path" {
-    try testing.expect(isPath("/dev/null"));
-    try testing.expect(isPath("main.zig"));
-    try testing.expect(isPath("src/tty.zig"));
-    try testing.expect(isPath("a/b/c"));
-
-    try testing.expect(!isPath("a"));
-    try testing.expect(!isPath("abcdefghijklmnopqrstuvwxyz"));
-
-    // the heuristics are not perfect! not all "files" will be considered as a file
-    try testing.expect(!isPath("Makefile"));
-}
-
 /// read the candidates from the buffer
 pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8, plain: bool) ![]Candidate {
     var candidates = ArrayList(Candidate).init(allocator);
