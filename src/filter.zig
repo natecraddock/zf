@@ -49,7 +49,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 }
 
 test "collectCandidates whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
+    var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ', false);
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -60,7 +60,7 @@ test "collectCandidates whitespace" {
 }
 
 test "collectCandidates newline" {
-    var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
+    var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n', false);
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -71,7 +71,7 @@ test "collectCandidates newline" {
 }
 
 test "collectCandidates excess whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
+    var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ', false);
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
