@@ -65,6 +65,10 @@ pub const Terminal = struct {
         self.writer.print("\x1b[{d}{c}", args) catch unreachable;
     }
 
+    fn writeBytes(self: *Terminal, bytes: []const u8) void {
+        _ = std.os.write(self.tty.handle, bytes) catch unreachable;
+    }
+
     pub fn clearLine(self: *Terminal) void {
         self.cursorCol(1);
         self.write(.{ 2, 'K' });
@@ -180,26 +184,52 @@ const State = struct {
     selected: usize,
 };
 
-fn highlightRanges(terminal: *Terminal, index: usize, ranges: []filter.Range) void {
-    for (ranges) |*range| {
-        if (index == range.start) {
-            terminal.sgr(.FG_CYAN);
-        } else if (index == range.end + 1) {
-            terminal.sgr(.FG_DEFAULT);
+fn getNextSlice(ranges: []filter.Range, start: usize) ?*filter.Range {
+    var min: ?*filter.Range = null;
+    for (ranges) |*r| {
+        if (r.start >= start) {
+            if (min == null or r.start < min.?.start) {
+                min = r;
+            } else if (r.start == min.?.start and r.end > min.?.end) {
+                min = r;
+            }
         }
     }
+    return min;
 }
 
 inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize, selected: bool) void {
     if (selected) terminal.sgr(.REVERSE);
+    defer terminal.sgr(.RESET);
 
-    var str = candidate.str[0..std.math.min(width, candidate.str.len)];
-    for (str) |c, i| {
-        if (candidate.ranges != null) highlightRanges(terminal, i, candidate.ranges.?);
-        terminal.writer.writeByte(c) catch unreachable;
+    const str = candidate.str[0..std.math.min(width, candidate.str.len)];
+
+    // no highlights, just draw the string
+    if (candidate.ranges == null) {
+        _ = terminal.writer.write(str) catch unreachable;
+    } else {
+        // slice into substrings for highlighting
+        var index: usize = 0;
+        while (true) {
+            if (getNextSlice(candidate.ranges.?, index)) |slice| {
+                // not at a range, draw the chars up to the range
+                if (index != slice.start) {
+                    terminal.sgr(.FG_DEFAULT);
+                    terminal.writeBytes(str[index..slice.start]);
+                }
+
+                terminal.sgr(.FG_CYAN);
+                terminal.writeBytes(str[slice.start .. slice.end + 1]);
+
+                index = slice.end + 1;
+            } else {
+                // potentially some chars left to draw
+                terminal.sgr(.FG_DEFAULT);
+                terminal.writeBytes(str[index..]);
+                break;
+            }
+        }
     }
-
-    terminal.sgr(.RESET);
 }
 
 inline fn numDigits(number: usize) u16 {
