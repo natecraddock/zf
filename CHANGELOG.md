@@ -1,5 +1,13 @@
 # master
 
+* **feat**: draw count information in the query line
+
+  Display a [filtered count]/[total count] indicator on the right side of the
+  query line. Currently this is enabled and cannot be toggled, but a flag will
+  be added soon.
+
+* **feat**: switch from bright blue to cyan for highlights
+
 # 0.3
 
 This release improves the ranking algorithm, adds two new commandline options,
