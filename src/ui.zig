@@ -66,7 +66,7 @@ pub const Terminal = struct {
     }
 
     pub fn clearLine(self: *Terminal) void {
-        self.write(.{ 0, 'G' });
+        self.cursorCol(1);
         self.write(.{ 2, 'K' });
     }
 
@@ -83,6 +83,18 @@ pub const Terminal = struct {
 
     pub fn lineDown(self: *Terminal, num: usize) void {
         self.write(.{ num, 'B' });
+    }
+
+    pub fn cursorRight(self: *Terminal, num: usize) void {
+        self.write(.{ num, 'C' });
+    }
+
+    pub fn cursorLeft(self: *Terminal, num: usize) void {
+        self.write(.{ num, 'D' });
+    }
+
+    pub fn cursorCol(self: *Terminal, col: usize) void {
+        self.write(.{ col, 'G' });
     }
 
     pub fn sgr(self: *Terminal, code: Attribute) void {
@@ -190,7 +202,12 @@ inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize,
     terminal.sgr(.RESET);
 }
 
-fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate) !void {
+inline fn numDigits(number: usize) u16 {
+    if (number == 0) return 1;
+    return @intCast(u16, std.math.log10(number) + 1);
+}
+
+fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate, total_candidates: usize) !void {
     const width = terminal.windowSize().?.x;
 
     // draw the candidates
@@ -205,14 +222,20 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
 
     // draw the prompt
     terminal.clearLine();
-    try terminal.writer.print("> {s}\r", .{query.items});
+    try terminal.writer.print("> {s}", .{query.items[0..std.math.min(width - 2, query.items.len)]});
 
-    // move cursor by drawing chars
-    _ = try terminal.writer.write("> ");
-    for (query.items) |c, index| {
-        if (index == state.cursor) break;
-        _ = try terminal.writer.writeByte(c);
+    // draw info if there is room
+    const prompt_width = 2;
+    const separator_width = 1;
+    const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.items.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
+    if (spacing >= 1) {
+        terminal.cursorRight(@intCast(usize, spacing));
+        try terminal.writer.print("{}/{}", .{ candidates.len, total_candidates });
     }
+
+    // position the cursor at the edit location
+    terminal.cursorCol(1);
+    terminal.cursorRight(std.math.min(width - 1, state.cursor + 2));
 }
 
 const Action = union(enum) {
@@ -333,7 +356,7 @@ pub fn run(
         // did the selection move?
         if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
             old_state = state;
-            try draw(terminal, &state, query, filtered);
+            try draw(terminal, &state, query, filtered, candidates.len);
             redraw = false;
         }
 
