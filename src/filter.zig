@@ -203,11 +203,19 @@ pub fn rankToken(
         } else break;
     }
 
-    // retry on the full string
     if (best_rank != null) {
         // was a filename match, give priority
         best_rank.? /= 2.0;
+
+        // how much of the token matched the filename?
+        if (token.len == name.?.len) {
+            best_rank.? /= 2.0;
+        } else {
+            const coverage = 1.0 - (@intToFloat(f64, token.len) / @intToFloat(f64, name.?.len));
+            best_rank.? *= coverage;
+        }
     } else {
+        // retry on the full string
         it = IndexIterator.init(str, token[0], smart_case);
         while (it.next()) |start_index| {
             if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
