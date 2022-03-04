@@ -81,11 +81,11 @@ pub const Terminal = struct {
         }
     }
 
-    pub fn lineUp(self: *Terminal, num: usize) void {
+    pub fn cursorUp(self: *Terminal, num: usize) void {
         self.write(.{ num, 'A' });
     }
 
-    pub fn lineDown(self: *Terminal, num: usize) void {
+    pub fn cursorDown(self: *Terminal, num: usize) void {
         self.write(.{ num, 'B' });
     }
 
@@ -243,12 +243,12 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     // draw the candidates
     var line: usize = 0;
     while (line < terminal.height) : (line += 1) {
-        terminal.lineDown(1);
+        terminal.cursorDown(1);
         terminal.clearLine();
         if (line < candidates.len) drawCandidate(terminal, candidates[line], width, line == state.selected);
     }
     terminal.sgr(.RESET);
-    terminal.lineUp(terminal.height);
+    terminal.cursorUp(terminal.height);
 
     // draw the prompt
     terminal.clearLine();
@@ -363,7 +363,7 @@ pub fn run(
     // effectively scrolling the view. + 1 to also include the prompt's offset
     terminal.determineHeight();
     terminal.scrollDown(terminal.height);
-    terminal.lineUp(terminal.height);
+    terminal.cursorUp(terminal.height);
 
     var filtered = candidates;
 
@@ -447,8 +447,8 @@ pub fn cleanUp(terminal: *Terminal) !void {
     var i: usize = 0;
     while (i < terminal.height) : (i += 1) {
         terminal.clearLine();
-        terminal.lineDown(1);
+        terminal.cursorDown(1);
     }
     terminal.clearLine();
-    terminal.lineUp(terminal.height);
+    terminal.cursorUp(terminal.height);
 }
