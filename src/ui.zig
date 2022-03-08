@@ -390,7 +390,7 @@ pub fn run(
             redraw = false;
         }
 
-        const visible_rows = std.math.min(terminal.height, filtered.len);
+        const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
 
         const action = keyToAction(readKey(terminal));
         switch (action) {
