@@ -135,6 +135,12 @@ const Key = union(enum) {
     none,
 };
 
+fn readDelete(reader: anytype) Key {
+    const byte = reader.readByte() catch return .esc;
+    if (byte == '~') return .delete;
+    return .esc;
+}
+
 fn readKey(terminal: *Terminal) Key {
     const reader = terminal.tty.reader();
 
@@ -156,7 +162,7 @@ fn readKey(terminal: *Terminal) Key {
                 'B' => .down,
                 'C' => .right,
                 'D' => .left,
-                '3' => .delete,
+                '3' => readDelete(reader),
                 else => .esc,
             };
         }
