@@ -294,8 +294,8 @@ fn ctrlToAction(key: u8) Action {
         ctrl('c') => .close,
         ctrl('w') => .delete_word,
         ctrl('u') => .delete_line,
-        ctrl('p') => .line_up,
-        ctrl('n') => .line_down,
+        ctrl('p'), ctrl('k') => .line_up,
+        ctrl('n'), ctrl('j') => .line_down,
         else => .pass,
     };
 }
