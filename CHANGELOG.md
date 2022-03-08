@@ -1,5 +1,9 @@
 # master
 
+* **feat**: add `ctrl-j` and `ctrl-k` mappings
+
+  Adds two mappings for moving the selected line.
+
 * **feat**: draw count information in the query line
 
   Display a [filtered count]/[total count] indicator on the right side of the
