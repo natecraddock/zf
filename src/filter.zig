@@ -164,6 +164,10 @@ const IndexIterator = struct {
     }
 };
 
+inline fn inRange(a: Range, b: Range) bool {
+    return b.start >= a.start and b.end <= a.end;
+}
+
 /// rank a candidate against the given query tokens
 ///
 /// algorithm inspired by https://github.com/garybernhardt/selecta
@@ -172,9 +176,13 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
+    var matched_filename = false;
     for (query_tokens) |token, i| {
-        if (rankToken(candidate.str, candidate.name, &candidate.ranges.?[i], token, smart_case)) |r| {
+        if (rankToken(candidate.str, candidate.name, &candidate.ranges.?[i], token, &matched_filename, smart_case)) |r| {
             candidate.rank += r;
+
+            // penalty for a match within the same range as the previous match
+            if (i > 0 and inRange(candidate.ranges.?[i - 1], candidate.ranges.?[i])) candidate.rank += 1;
         } else return false;
     }
 
@@ -187,23 +195,28 @@ pub fn rankToken(
     name: ?[]const u8,
     range: *Range,
     token: []const u8,
+    matched_filename: *bool,
     smart_case: bool,
 ) ?f64 {
     // iterate over the indexes where the first char of the token matches
     var best_rank: ?f64 = null;
     var it = IndexIterator.init(name.?, token[0], smart_case);
 
-    const offs = str.len - name.?.len;
-    while (it.next()) |start_index| {
-        if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
-            if (best_rank == null or match.rank < best_rank.?) {
-                best_rank = match.rank;
-                range.* = .{ .start = match.start + offs, .end = match.end + offs };
-            }
-        } else break;
+    if (!matched_filename.*) {
+        const offs = str.len - name.?.len;
+        while (it.next()) |start_index| {
+            if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
+                if (best_rank == null or match.rank < best_rank.?) {
+                    best_rank = match.rank;
+                    range.* = .{ .start = match.start + offs, .end = match.end + offs };
+                }
+            } else break;
+        }
     }
 
     if (best_rank != null) {
+        matched_filename.* = true;
+
         // was a filename match, give priority
         best_rank.? /= 2.0;
 
