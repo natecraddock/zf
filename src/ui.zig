@@ -156,7 +156,8 @@ fn readKey(terminal: *Terminal) Key {
         seq[0] = reader.readByte() catch return .esc;
         seq[1] = reader.readByte() catch return .esc;
 
-        if (seq[0] == '[') {
+        // DECCKM mode sends \x1bO* instead of \x1b[*
+        if (seq[0] == '[' or seq[0] == 'O') { 
             return switch (seq[1]) {
                 'A' => .up,
                 'B' => .down,
