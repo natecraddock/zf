@@ -1,5 +1,5 @@
 const std = @import("std");
-const system = std.os.linux;
+const system = std.os.system;
 
 const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
@@ -111,9 +111,9 @@ pub const Terminal = struct {
     };
 
     pub fn windowSize(self: *Terminal) ?WinSize {
-        var size: std.os.linux.winsize = undefined;
+        var size: system.winsize = undefined;
 
-        if (std.os.linux.ioctl(self.tty.handle, std.os.system.T.IOCGWINSZ, @ptrToInt(&size)) == -1) {
+        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @ptrToInt(&size)) == -1) {
             return null;
         }
 
