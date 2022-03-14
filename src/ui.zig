@@ -4,6 +4,7 @@ const system = std.os.system;
 const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
 const File = std.fs.File;
+const BufferedWriter = std.io.BufferedWriter;
 
 const filter = @import("filter.zig");
 
@@ -18,7 +19,7 @@ const Attribute = enum(u8) {
 
 pub const Terminal = struct {
     tty: File,
-    writer: File.Writer,
+    writer: BufferedWriter(4096, File.Writer),
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
@@ -39,7 +40,7 @@ pub const Terminal = struct {
 
         return Terminal{
             .tty = tty,
-            .writer = tty.writer(),
+            .writer = std.io.bufferedWriter(tty.writer()),
             .termios = termios,
             .raw_termios = raw_termios,
             .max_height = max_height,
@@ -61,12 +62,19 @@ pub const Terminal = struct {
         self.height = std.math.clamp(self.max_height, 1, win_size.?.y - 1);
     }
 
+    pub fn print(self: *Terminal, comptime str: []const u8, args: anytype) void {
+        const writer = self.writer.writer();
+        writer.print(str, args) catch unreachable;
+    }
+
     fn write(self: *Terminal, args: anytype) void {
-        self.writer.print("\x1b[{d}{c}", args) catch unreachable;
+        const writer = self.writer.writer();
+        writer.print("\x1b[{d}{c}", args) catch unreachable;
     }
 
     fn writeBytes(self: *Terminal, bytes: []const u8) void {
-        _ = std.os.write(self.tty.handle, bytes) catch unreachable;
+        const writer = self.writer.writer();
+        _ = writer.write(bytes) catch unreachable;
     }
 
     pub fn clearLine(self: *Terminal) void {
@@ -157,7 +165,7 @@ fn readKey(terminal: *Terminal) Key {
         seq[1] = reader.readByte() catch return .esc;
 
         // DECCKM mode sends \x1bO* instead of \x1b[*
-        if (seq[0] == '[' or seq[0] == 'O') { 
+        if (seq[0] == '[' or seq[0] == 'O') {
             return switch (seq[1]) {
                 'A' => .up,
                 'B' => .down,
@@ -259,7 +267,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
 
     // draw the prompt
     terminal.clearLine();
-    try terminal.writer.print("> {s}", .{query.items[0..std.math.min(width - 2, query.items.len)]});
+    terminal.print("> {s}", .{query.items[0..std.math.min(width - 2, query.items.len)]});
 
     // draw info if there is room
     const prompt_width = 2;
@@ -267,12 +275,14 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.items.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
     if (spacing >= 1) {
         terminal.cursorRight(@intCast(usize, spacing));
-        try terminal.writer.print("{}/{}", .{ candidates.len, total_candidates });
+        terminal.print("{}/{}", .{ candidates.len, total_candidates });
     }
 
     // position the cursor at the edit location
     terminal.cursorCol(1);
     terminal.cursorRight(std.math.min(width - 1, state.cursor + 2));
+
+    try terminal.writer.flush();
 }
 
 const Action = union(enum) {
