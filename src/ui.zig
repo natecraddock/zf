@@ -290,7 +290,9 @@ const Action = union(enum) {
     line_up,
     line_down,
     cursor_left,
+    cursor_leftmost,
     cursor_right,
+    cursor_rightmost,
     backspace,
     delete,
     delete_word,
@@ -311,6 +313,12 @@ fn ctrlToAction(key: u8) Action {
         ctrl('c') => .close,
         ctrl('w') => .delete_word,
         ctrl('u') => .delete_line,
+        ctrl('h') => .backspace,
+        ctrl('a') => .cursor_leftmost,
+        ctrl('e') => .cursor_rightmost,
+        ctrl('d') => .delete,
+        ctrl('f') => .cursor_right,
+        ctrl('b') => .cursor_left,
         ctrl('p'), ctrl('k') => .line_up,
         ctrl('n'), ctrl('j') => .line_down,
         else => .pass,
@@ -444,6 +452,12 @@ pub fn run(
             },
             .cursor_left => if (state.cursor > 0) {
                 state.cursor -= 1;
+            },
+            .cursor_leftmost => if (state.cursor > 0) {
+                state.cursor = 0;
+            },
+            .cursor_rightmost => if (state.cursor < query.items.len) {
+                state.cursor = query.items.len;
             },
             .cursor_right => if (state.cursor < query.items.len) {
                 state.cursor += 1;
