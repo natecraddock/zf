@@ -90,12 +90,9 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-#### 0.4
-* further improvements to ranking
-* improve testing
-* utf-8 support
-
 #### 0.5
+* utf-8 support
+* further improvements to ranking
 * macos support
 
 #### 1.0
