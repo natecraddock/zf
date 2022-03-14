@@ -1,16 +1,54 @@
 # master
 
-* **feat**: add `ctrl-j` and `ctrl-k` mappings
+# 0.4
 
-  Adds two mappings for moving the selected line.
+This release includes many refactors and cleanups to the code. Flicker in
+drawing the UI has been resolved, and work has begun on macOS support. And
+finally, the algorithm for matching on filenames has received an update and
+should be even more precise.
+
+Commit hashes are now included in the changelog for convenience.
+
+* **feat**: increase ranking algorithm precision
+  ([d31e70](https://github.com/natecraddock/zf/commit/d31e70))
+
+  Matches on filenames are now given a rank priority relative to the percentage
+  of the filename matched. As more query term letters match the filename, the
+  higher it ranks.
 
 * **feat**: draw count information in the query line
+  ([6aa45e](https://github.com/natecraddock/zf/commit/6aa45e))
 
   Display a [filtered count]/[total count] indicator on the right side of the
   query line. Currently this is enabled and cannot be toggled, but a flag will
   be added soon.
 
+* **feat**: add more readline bindings ([@jmbaur](https://github.com/jmbaur))
+  ([9c7a78](https://github.com/natecraddock/zf/commit/9c7a78))
+
+* **feat**: add `ctrl-j` and `ctrl-k` mappings
+  ([3fb459](https://github.com/natecraddock/zf/commit/3fb459))
+
 * **feat**: switch from bright blue to cyan for highlights
+  ([ee05d3](https://github.com/natecraddock/zf/commit/ee05d3))
+
+* **fix**: delete keybinding
+  ([cbb467](https://github.com/natecraddock/zf/commit/cbb467))
+
+* **fix**: remove flicker in the TUI
+  ([cc7c2c](https://github.com/natecraddock/zf/commit/cc7c2c))
+
+  The default TTY writer was not buffered. Buffering the output reduces syscalls
+  and makes the TUI much more responsive!
+
+* **fix**: emit DECCKM "application mode" escape sequences
+  ([@ratfactor](https://github.com/ratfactor))
+  ([d2c795](https://github.com/natecraddock/zf/commit/d2c795))
+
+* **fix**: failure to render TUI on macOS
+  ([9ade19](https://github.com/natecraddock/zf/commit/9ade19))
+
+  macOS support is still not official, but should work better now.
 
 # 0.3
 
