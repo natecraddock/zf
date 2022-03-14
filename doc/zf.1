@@ -1,4 +1,4 @@
-.TH ZF 1 "2022-02-21" "zf 0.4"
+.TH ZF 1 "2022-03-14" "zf 0.4"
 
 .SH NAME
 zf -\ a commandline fuzzy finder that prioritizes matches on filenames
@@ -53,11 +53,11 @@ Display help and exit
 
 .TP
 .BR enter
-Print the selected line on stdout and exit
+Write the selected line to stdout and exit
 
 .TP
 .BR "escape, ctrl-c"
-Exit the finder without selecting anything
+Exit zf without selecting anything
 
 .TP
 .BR "up, ctrl-p, ctrl-k"
@@ -68,11 +68,27 @@ Select the next line up
 Select the next line down
 
 .TP
-.BR backspace
+.BR "left, ctrl-b"
+Move the cursor left
+
+.TP
+.BR "right, ctrl-f"
+Move the cursor right
+
+.TP
+.BR ctrl-a
+Move the cursor to the beginning of the line
+
+.TP
+.BR ctrl-e
+Move the cursor to the end of the line
+
+.TP
+.BR "backspace, ctrl-h"
 Delete the character before the cursor
 
 .TP
-.BR delete
+.BR "delete, ctrl-d"
 Delete the character under the cursor
 
 .TP
