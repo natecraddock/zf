@@ -27,12 +27,12 @@ _zf() {
     # option completions
     case $cur in
         --*)
-            COMPREPLY=( $( compgen -W "--filter --keep-order --lines --version --help" -- "$cur" ) )
+            COMPREPLY=( $( compgen -W "--filter --keep-order --lines --plain --version --help" -- "$cur" ) )
             return 0
             ;;
 
         -*)
-            COMPREPLY=( $( compgen -W "-f -k -l -v -h" -- $cur ) )
+            COMPREPLY=( $( compgen -W "-f -k -l -p -v -h" -- $cur ) )
             ;;
     esac
 
