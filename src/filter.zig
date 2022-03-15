@@ -191,16 +191,20 @@ pub fn rankToken(
 ) ?f64 {
     // iterate over the indexes where the first char of the token matches
     var best_rank: ?f64 = null;
-    var it = IndexIterator.init(name.?, token[0], smart_case);
 
-    const offs = str.len - name.?.len;
-    while (it.next()) |start_index| {
-        if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
-            if (best_rank == null or match.rank < best_rank.?) {
-                best_rank = match.rank;
-                range.* = .{ .start = match.start + offs, .end = match.end + offs };
-            }
-        } else break;
+    var it: IndexIterator = undefined;
+    if (name != null) {
+        it = IndexIterator.init(name.?, token[0], smart_case);
+        const offs = str.len - name.?.len;
+
+        while (it.next()) |start_index| {
+            if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
+                if (best_rank == null or match.rank < best_rank.?) {
+                    best_rank = match.rank;
+                    range.* = .{ .start = match.start + offs, .end = match.end + offs };
+                }
+            } else break;
+        }
     }
 
     if (best_rank != null) {
