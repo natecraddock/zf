@@ -82,6 +82,16 @@ zf could be interpreted as a shortened [fzf](https://github.com/junegunn/fzf) or
 find" or "Zig fuzzy finder". I like to think of it as a more efficient way to
 type `fzf`, emphasizing the speed and precision of the finding algorithm.
 
+## Integrations
+
+Would you like to use zf in an editor? Try one of the following plugins
+
+* [zf.vim](https://github.com/ratfactor/zf.vim): zf integrated with vim for
+  fuzzy file finding. Similar to fzf.vim.
+* [telescope-zf-native.nvim](https://github.com/natecraddock/telescope-zf-native.nvim)
+  a neovim [telescope](https://github.com/nvim-telescope/telescope.nvim)
+  extension to override the default Lua sorter with zf.
+
 ## Status
 
 zf now works for fast and accurate file matching. I would like to improve the
