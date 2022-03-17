@@ -482,4 +482,6 @@ pub fn cleanUp(terminal: *Terminal) !void {
     }
     terminal.clearLine();
     terminal.cursorUp(terminal.height);
+
+    try terminal.writer.flush();
 }
