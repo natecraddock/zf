@@ -332,6 +332,7 @@ const Action = union(enum) {
     delete,
     delete_word,
     delete_line,
+    delete_line_forward,
     select,
     close,
     pass,
@@ -343,7 +344,7 @@ fn ctrl(comptime key: u8) u8 {
 
 // TODO: for some reason this needs to be extracted to a separate function,
 // perhaps related to ziglang/zig#137
-fn ctrlToAction(key: u8) Action {
+fn ctrlToAction(key: u8, vi_mode: bool) Action {
     return switch (key) {
         ctrl('c') => .close,
         ctrl('w') => .delete_word,
@@ -354,16 +355,17 @@ fn ctrlToAction(key: u8) Action {
         ctrl('d') => .delete,
         ctrl('f') => .cursor_right,
         ctrl('b') => .cursor_left,
-        ctrl('p'), ctrl('k') => .line_up,
+        ctrl('p') => .line_up,
         ctrl('n'), ctrl('j') => .line_down,
+        ctrl('k') => if (vi_mode) Action{ .line_up = {} } else Action{ .delete_line_forward = {} },
         else => .pass,
     };
 }
 
-fn keyToAction(key: Key) Action {
+fn keyToAction(key: Key, vi_mode: bool) Action {
     return switch (key) {
         .character => |c| .{ .byte = c },
-        .control => |c| ctrlToAction(c),
+        .control => |c| ctrlToAction(c, vi_mode),
         .backspace => .backspace,
         .delete => .delete,
         .up => .line_up,
@@ -411,6 +413,7 @@ pub fn run(
     candidates: []Candidate,
     keep_order: bool,
     prompt_str: []const u8,
+    vi_mode: bool,
 ) !?[]const u8 {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
@@ -454,7 +457,7 @@ pub fn run(
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
 
-        const action = keyToAction(readKey(terminal));
+        const action = keyToAction(readKey(terminal), vi_mode);
         switch (action) {
             .byte => |b| {
                 try query.insert(state.cursor, b);
@@ -465,6 +468,11 @@ pub fn run(
                 while (state.cursor > 0) {
                     _ = query.orderedRemove(state.cursor - 1);
                     state.cursor -= 1;
+                }
+            },
+            .delete_line_forward => {
+                while (query.items.len > state.cursor) {
+                    _ = query.pop();
                 }
             },
             .backspace => {

@@ -228,13 +228,22 @@ pub fn main() anyerror!void {
         }
     } else {
         const prompt_str = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
+        const vi_mode = if (std.process.getEnvVarOwned(allocator, "ZF_VI_MODE")) |value| blk: {
+            break :blk value.len > 0;
+        } else |_| false;
         const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
             break :blk value.len > 0;
-        }
-        else |_| false;
+        } else |_| false;
 
         var terminal = try ui.Terminal.init(@minimum(candidates.len, config.lines), no_color);
-        var selected = try ui.run(allocator, &terminal, candidates, config.keep_order, prompt_str);
+        var selected = try ui.run(
+            allocator,
+            &terminal,
+            candidates,
+            config.keep_order,
+            prompt_str,
+            vi_mode,
+        );
         try ui.cleanUp(&terminal);
         terminal.deinit();
 
