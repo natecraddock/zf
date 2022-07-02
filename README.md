@@ -100,10 +100,12 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-#### 0.5
+#### 0.6
 * utf-8 support
+
+#### 0.7
+* packaging (homebrew, debian, etc)
 * further improvements to ranking
-* macos support
 
 #### 1.0
 * stabilized ranking algorithm
