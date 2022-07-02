@@ -199,19 +199,61 @@ const State = struct {
     selected: usize,
 };
 
-fn getNextSlice(ranges: []filter.Range, start: usize) ?*filter.Range {
-    var min: ?*filter.Range = null;
-    for (ranges) |*r| {
-        if (r.start >= start) {
-            if (min == null or r.start < min.?.start) {
-                min = r;
-            } else if (r.start == min.?.start and r.end > min.?.end) {
-                min = r;
+const HighlightSlice = struct {
+    str: []const u8,
+    highlight: bool,
+};
+
+const Slicer = struct {
+    index: usize = 0,
+    str: []const u8,
+    ranges: []filter.Range,
+
+    fn init(str: []const u8, ranges: []filter.Range) Slicer {
+        return .{
+            .str = str,
+            .ranges = ranges,
+        };
+    }
+
+    fn nextRange(slicer: *Slicer) ?*filter.Range {
+        var next_range: ?*filter.Range = null;
+        for (slicer.ranges) |*r| {
+            if (r.start >= slicer.index) {
+                if (next_range == null or r.start < next_range.?.start) {
+                    next_range = r;
+                } else if (r.start == next_range.?.start and r.end > next_range.?.end) {
+                    next_range = r;
+                }
             }
         }
+        return next_range;
     }
-    return min;
-}
+
+    fn next(slicer: *Slicer) ?HighlightSlice {
+        if (slicer.index >= slicer.str.len) return null;
+
+        var highlight = false;
+        const str = if (slicer.nextRange()) |range| blk: {
+            // next highlight range past the visible end of the string
+            if (range.start >= slicer.str.len) {
+                break :blk slicer.str[slicer.index..];
+            }
+
+            if (slicer.index == range.start) {
+                // inside highlight range
+                highlight = true;
+                break :blk slicer.str[range.start..std.math.min(slicer.str.len, range.end + 1)];
+            } else {
+                // before a highlight range
+                break :blk slicer.str[slicer.index..std.math.min(slicer.str.len, range.start)];
+            }
+        } else slicer.str[slicer.index..];
+
+        slicer.index += str.len;
+        return HighlightSlice{ .str = str, .highlight = highlight };
+    }
+};
 
 inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize, selected: bool) void {
     if (selected) terminal.sgr(.REVERSE);
@@ -223,26 +265,14 @@ inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize,
     if (candidate.ranges == null) {
         _ = terminal.writer.write(str) catch unreachable;
     } else {
-        // slice into substrings for highlighting
-        var index: usize = 0;
-        while (true) {
-            if (getNextSlice(candidate.ranges.?, index)) |slice| {
-                // not at a range, draw the chars up to the range
-                if (index != slice.start) {
-                    terminal.sgr(.FG_DEFAULT);
-                    terminal.writeBytes(str[index..slice.start]);
-                }
-
+        var slicer = Slicer.init(str, candidate.ranges.?);
+        while (slicer.next()) |slice| {
+            if (slice.highlight) {
                 terminal.sgr(.FG_CYAN);
-                terminal.writeBytes(str[slice.start .. slice.end + 1]);
-
-                index = slice.end + 1;
             } else {
-                // potentially some chars left to draw
                 terminal.sgr(.FG_DEFAULT);
-                terminal.writeBytes(str[index..]);
-                break;
             }
+            terminal.writeBytes(slice.str);
         }
     }
 }
