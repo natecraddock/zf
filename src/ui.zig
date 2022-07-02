@@ -26,7 +26,9 @@ pub const Terminal = struct {
     height: usize = undefined,
     max_height: usize,
 
-    pub fn init(max_height: usize) !Terminal {
+    no_color: bool,
+
+    pub fn init(max_height: usize, no_color: bool) !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .read = true, .write = true });
 
         // store original terminal settings to restore later
@@ -44,6 +46,7 @@ pub const Terminal = struct {
             .termios = termios,
             .raw_termios = raw_termios,
             .max_height = max_height,
+            .no_color = no_color,
         };
     }
 
@@ -264,7 +267,7 @@ inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize,
     const str = candidate.str[0..std.math.min(width, candidate.str.len)];
 
     // no highlights, just draw the string
-    if (candidate.ranges == null) {
+    if (candidate.ranges == null or terminal.no_color) {
         _ = terminal.writer.write(str) catch unreachable;
     } else {
         var slicer = Slicer.init(str, candidate.ranges.?);
