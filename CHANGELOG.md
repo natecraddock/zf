@@ -1,5 +1,51 @@
 # master
 
+# 0.5
+
+This smaller release fixes a few bugs and adds support for a few environment variables.
+A long time coming (I've been focused on other projects), I'm finally back to work on zf. The next release will be focused on utf-8 unicode support.
+
+* **feat**: `ZF_PROMPT` environment variable
+  ([7c6b0a](https://github.com/natecraddock/zf/commit/7c6b0a))
+
+  Allows customization of the zf prompt. Note that this does not yet support
+  unicode characters. If you want a space displayed after the prompt, you must
+  include it in the string. For example: `export ZF_PROMPT="> "`.
+
+* **feat**: `ZF_VI_MODE` environment variable
+  ([ca05d3](https://github.com/natecraddock/zf/commit/ca05d3))
+
+  Adds an environment variable that changes the behavior of the ctrl+k
+  binding. When enabled (the variable is present and is not empty) ctrl+k
+  moves up a line. When disabled, ctrl+k acts like readline and deletes
+  from the cursor to the end of the line.
+
+* **feat**: `NO_COLOR` environment variable
+  ([541052](https://github.com/natecraddock/zf/commit/541052))
+
+  Support the semi-standardized `NO_COLOR` environment variable to disable
+  terminal colors.
+
+  See https://no-color.org
+
+* **fix**: missing null check
+  ([783441](https://github.com/natecraddock/zf/commit/783441b))
+
+  The name field was assumed to be not null so using the --plain option caused
+  a crash. Caught in telescope-zf-native.nvim
+
+* **fix**: trailing chars on TUI stdout
+  ([6a717d](https://github.com/natecraddock/zf/commit/6a717d19))
+
+  The buffer wasn't flushed properly, leading to the buffered lines of cleanup
+  print statements never being output.
+
+* **fix**: crash when highlight ranges extend past terminal width
+  ([bf437f](https://github.com/natecraddock/zf/commit/bf437f))
+
+  When a highlight range extended past the width of the terminal the slice
+  would go out of bounds causing a panic.
+
 # 0.4
 
 This release includes many refactors and cleanups to the code. Flicker in
