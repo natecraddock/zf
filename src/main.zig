@@ -227,8 +227,10 @@ pub fn main() anyerror!void {
             try stdout.print("{s}\n", .{candidate.str});
         }
     } else {
+        const prompt_str = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
+
         var terminal = try ui.Terminal.init(@minimum(candidates.len, config.lines));
-        var selected = try ui.run(allocator, &terminal, candidates, config.keep_order);
+        var selected = try ui.run(allocator, &terminal, candidates, config.keep_order, prompt_str);
         try ui.cleanUp(&terminal);
         terminal.deinit();
 

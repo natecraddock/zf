@@ -98,6 +98,7 @@ pub const Terminal = struct {
     }
 
     pub fn cursorRight(self: *Terminal, num: usize) void {
+        if (num == 0) return;
         self.write(.{ num, 'C' });
     }
 
@@ -197,6 +198,7 @@ fn readKey(terminal: *Terminal) Key {
 const State = struct {
     cursor: usize,
     selected: usize,
+    prompt: []const u8,
 };
 
 const HighlightSlice = struct {
@@ -296,11 +298,11 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     terminal.cursorUp(terminal.height);
 
     // draw the prompt
+    const prompt_width = state.prompt.len;
     terminal.clearLine();
-    terminal.print("> {s}", .{query.items[0..std.math.min(width - 2, query.items.len)]});
+    terminal.print("{s}{s}", .{ state.prompt, query.items[0..std.math.min(width - prompt_width, query.items.len)] });
 
     // draw info if there is room
-    const prompt_width = 2;
     const separator_width = 1;
     const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.items.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
     if (spacing >= 1) {
@@ -309,8 +311,8 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     }
 
     // position the cursor at the edit location
-    terminal.cursorCol(1);
-    terminal.cursorRight(std.math.min(width - 1, state.cursor + 2));
+    terminal.cursorCol(0);
+    terminal.cursorRight(std.math.min(width - 1, state.cursor + prompt_width));
 
     try terminal.writer.flush();
 }
@@ -405,6 +407,7 @@ pub fn run(
     terminal: *Terminal,
     candidates: []Candidate,
     keep_order: bool,
+    prompt_str: []const u8,
 ) !?[]const u8 {
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
@@ -412,6 +415,7 @@ pub fn run(
     var state = State{
         .cursor = 0,
         .selected = 0,
+        .prompt = prompt_str,
     };
 
     // ensure enough room to draw all lines of output by drawing blank lines,
