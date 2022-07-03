@@ -20,6 +20,15 @@ zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
 An [AUR package](https://aur.archlinux.org/packages/zf/) is available.
 
+### macOS
+
+Install with Homebrew
+
+```
+$ brew tap natecraddock/taps https://github.com/natecraddock/taps
+$ brew install zf
+```
+
 ### Building from source
 
 zf targets the latest stable release of Zig. Compile with `zig build
