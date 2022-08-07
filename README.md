@@ -1,6 +1,7 @@
 # zf
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
+[Docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md).
 
 ![zf](https://user-images.githubusercontent.com/7967463/155037380-79f61539-7d20-471b-8040-6ee7d0e4b6ea.gif)
 
@@ -37,7 +38,8 @@ zf targets the latest stable release of Zig. Compile with `zig build
 ## Use
 
 zf accepts lines on stdin and outputs the selection on stdout. Use with a pipe,
-or io redirection.
+or io redirection. See the
+[documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details.
 
 ## Why zf over fzf, fzy, selecta, pick, etc?
 
