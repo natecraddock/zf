@@ -29,7 +29,7 @@ pub const Terminal = struct {
     no_color: bool,
 
     pub fn init(max_height: usize, no_color: bool) !Terminal {
-        var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .read = true, .write = true });
+        var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
 
         // store original terminal settings to restore later
         var termios = try std.os.tcgetattr(tty.handle);
