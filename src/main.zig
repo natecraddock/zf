@@ -235,7 +235,7 @@ pub fn main() anyerror!void {
             break :blk value.len > 0;
         } else |_| false;
 
-        var terminal = try ui.Terminal.init(@minimum(candidates.len, config.lines), no_color);
+        var terminal = try ui.Terminal.init(@min(candidates.len, config.lines), no_color);
         var selected = try ui.run(
             allocator,
             &terminal,
