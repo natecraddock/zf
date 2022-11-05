@@ -7,7 +7,6 @@ const testing = std.testing;
 /// used to store the filename of the path in str.
 pub const Candidate = struct {
     str: []const u8,
-    name: ?[]const u8 = null,
     rank: f64 = 0,
     ranges: ?[]Range = null,
 };
@@ -18,7 +17,7 @@ pub const Range = struct {
 };
 
 /// read the candidates from the buffer
-pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8, plain: bool) ![]Candidate {
+pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]Candidate {
     var candidates = ArrayList(Candidate).init(allocator);
 
     // find delimiters
@@ -38,18 +37,11 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
         try candidates.append(.{ .str = buf[start..] });
     }
 
-    // extract filepaths
-    if (!plain) {
-        for (candidates.items) |*candidate| {
-            candidate.name = std.fs.path.basename(candidate.str);
-        }
-    }
-
     return candidates.toOwnedSlice();
 }
 
 test "collectCandidates whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ', false);
+    var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -60,7 +52,7 @@ test "collectCandidates whitespace" {
 }
 
 test "collectCandidates newline" {
-    var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n', false);
+    var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -71,7 +63,7 @@ test "collectCandidates newline" {
 }
 
 test "collectCandidates excess whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ', false);
+    var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -97,6 +89,7 @@ pub fn rankCandidates(
     candidates: []Candidate,
     query: []const u8,
     keep_order: bool,
+    plain: bool,
 ) ![]Candidate {
     var ranked = ArrayList(Candidate).init(allocator);
     const smart_case = !hasUpper(query);
@@ -113,7 +106,7 @@ pub fn rankCandidates(
     for (candidates) |candidate| {
         var c = candidate;
         c.ranges = try allocator.alloc(Range, query_tokens.len);
-        if (rankCandidate(&c, query_tokens, smart_case)) {
+        if (rankCandidate(&c, query_tokens, smart_case, plain)) {
             try ranked.append(c);
         }
     }
@@ -167,13 +160,19 @@ const IndexIterator = struct {
 /// rank a candidate against the given query tokens
 ///
 /// algorithm inspired by https://github.com/garybernhardt/selecta
-fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: bool) bool {
-    candidate.rank = 0;
+fn rankCandidate(
+    candidate: *Candidate,
+    query_tokens: [][]const u8,
+    smart_case: bool,
+    plain: bool,
+) bool {
+    const filename = if (plain) null else std.fs.path.basename(candidate.str);
 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
+    candidate.rank = 0;
     for (query_tokens) |token, i| {
-        if (rankToken(candidate.str, candidate.name, &candidate.ranges.?[i], token, smart_case)) |r| {
+        if (rankToken(candidate.str, filename, token, &candidate.ranges.?[i], smart_case)) |r| {
             candidate.rank += r;
         } else return false;
     }
@@ -184,51 +183,56 @@ fn rankCandidate(candidate: *Candidate, query_tokens: [][]const u8, smart_case: 
 
 pub fn rankToken(
     str: []const u8,
-    name: ?[]const u8,
-    range: *Range,
+    filenameOrNull: ?[]const u8,
     token: []const u8,
+    range: *Range,
     smart_case: bool,
 ) ?f64 {
-    // iterate over the indexes where the first char of the token matches
+    if (str.len == 0 or token.len == 0) return null;
+
+    // iterates over the string performing a match starting at each possible index
+    // the best (minimum) overall ranking is kept and returned
     var best_rank: ?f64 = null;
 
-    var it: IndexIterator = undefined;
-    if (name != null) {
-        it = IndexIterator.init(name.?, token[0], smart_case);
-        const offs = str.len - name.?.len;
+    // perform search on the filename only if requested
+    if (filenameOrNull) |filename| {
+        const offs = str.len - filename.len;
 
+        var it = IndexIterator.init(filename, token[0], smart_case);
         while (it.next()) |start_index| {
-            if (scanToEnd(name.?, token[1..], start_index, smart_case)) |match| {
+            if (scanToEnd(filename, token[1..], start_index, smart_case)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                     range.* = .{ .start = match.start + offs, .end = match.end + offs };
                 }
             } else break;
         }
+
+        if (best_rank != null) {
+            // was a filename match, give priority
+            best_rank.? /= 2.0;
+
+            // how much of the token matched the filename?
+            if (token.len == filename.len) {
+                best_rank.? /= 2.0;
+            } else {
+                const coverage = 1.0 - (@intToFloat(f64, token.len) / @intToFloat(f64, filename.len));
+                best_rank.? *= coverage;
+            }
+
+            return best_rank;
+        }
     }
 
-    if (best_rank != null) {
-        // was a filename match, give priority
-        best_rank.? /= 2.0;
-
-        // how much of the token matched the filename?
-        if (token.len == name.?.len) {
-            best_rank.? /= 2.0;
-        } else {
-            const coverage = 1.0 - (@intToFloat(f64, token.len) / @intToFloat(f64, name.?.len));
-            best_rank.? *= coverage;
-        }
-    } else {
-        // retry on the full string
-        it = IndexIterator.init(str, token[0], smart_case);
-        while (it.next()) |start_index| {
-            if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
-                if (best_rank == null or match.rank < best_rank.?) {
-                    best_rank = match.rank;
-                    range.* = .{ .start = match.start, .end = match.end };
-                }
-            } else break;
-        }
+    // perform search on the full string if requested or if no match was found on the filename
+    var it = IndexIterator.init(str, token[0], smart_case);
+    while (it.next()) |start_index| {
+        if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
+            if (best_rank == null or match.rank < best_rank.?) {
+                best_rank = match.rank;
+                range.* = .{ .start = match.start, .end = match.end };
+            }
+        } else break;
     }
 
     return best_rank;

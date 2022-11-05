@@ -217,11 +217,11 @@ pub fn main() anyerror!void {
     const buf = try readAll(allocator, &stdin);
 
     const delimiter = '\n';
-    var candidates = try filter.collectCandidates(allocator, buf, delimiter, config.plain);
+    var candidates = try filter.collectCandidates(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.skip_ui) {
-        const filtered = try filter.rankCandidates(allocator, candidates, config.query, config.keep_order);
+        const filtered = try filter.rankCandidates(allocator, candidates, config.query, config.keep_order, config.plain);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});
@@ -241,6 +241,7 @@ pub fn main() anyerror!void {
             &terminal,
             candidates,
             config.keep_order,
+            config.plain,
             prompt_str,
             vi_mode,
         );

@@ -412,6 +412,7 @@ pub fn run(
     terminal: *Terminal,
     candidates: []Candidate,
     keep_order: bool,
+    plain: bool,
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const u8 {
@@ -443,7 +444,7 @@ pub fn run(
             old_query = try allocator.alloc(u8, query.items.len);
             std.mem.copy(u8, old_query, query.items);
 
-            filtered = try filter.rankCandidates(allocator, candidates, query.items, keep_order);
+            filtered = try filter.rankCandidates(allocator, candidates, query.items, keep_order, plain);
             redraw = true;
             state.selected = 0;
         }
