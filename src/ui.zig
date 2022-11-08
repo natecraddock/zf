@@ -267,19 +267,19 @@ inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize,
     const str = candidate.str[0..std.math.min(width, candidate.str.len)];
 
     // no highlights, just draw the string
-    if (candidate.ranges == null or terminal.no_color) {
+    // if (candidate.ranges == null or terminal.no_color) {
         _ = terminal.writer.write(str) catch unreachable;
-    } else {
-        var slicer = Slicer.init(str, candidate.ranges.?);
-        while (slicer.next()) |slice| {
-            if (slice.highlight) {
-                terminal.sgr(.FG_CYAN);
-            } else {
-                terminal.sgr(.FG_DEFAULT);
-            }
-            terminal.writeBytes(slice.str);
-        }
-    }
+    // } else {
+    //     var slicer = Slicer.init(str, candidate.ranges.?);
+    //     while (slicer.next()) |slice| {
+    //         if (slice.highlight) {
+    //             terminal.sgr(.FG_CYAN);
+    //         } else {
+    //             terminal.sgr(.FG_DEFAULT);
+    //         }
+    //         terminal.writeBytes(slice.str);
+    //     }
+    // }
 }
 
 inline fn numDigits(number: usize) u16 {

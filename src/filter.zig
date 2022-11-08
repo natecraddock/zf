@@ -8,7 +8,6 @@ const testing = std.testing;
 pub const Candidate = struct {
     str: []const u8,
     rank: f64 = 0,
-    ranges: ?[]Range = null,
 };
 
 pub const Range = struct {
@@ -104,8 +103,8 @@ pub fn rankCandidates(
     var query_tokens = try splitQuery(allocator, query);
     defer allocator.free(query_tokens);
     for (candidates) |candidate| {
+        // TODO: is this copy needed?
         var c = candidate;
-        c.ranges = try allocator.alloc(Range, query_tokens.len);
         if (rankCandidate(&c, query_tokens, smart_case, plain)) {
             try ranked.append(c);
         }
@@ -171,8 +170,8 @@ fn rankCandidate(
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
     candidate.rank = 0;
-    for (query_tokens) |token, i| {
-        if (rankToken(candidate.str, filename, token, &candidate.ranges.?[i], smart_case)) |r| {
+    for (query_tokens) |token| {
+        if (rankToken(candidate.str, filename, token, smart_case)) |r| {
             candidate.rank += r;
         } else return false;
     }
@@ -185,7 +184,6 @@ pub fn rankToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
     token: []const u8,
-    range: *Range,
     smart_case: bool,
 ) ?f64 {
     if (str.len == 0 or token.len == 0) return null;
@@ -196,14 +194,11 @@ pub fn rankToken(
 
     // perform search on the filename only if requested
     if (filenameOrNull) |filename| {
-        const offs = str.len - filename.len;
-
         var it = IndexIterator.init(filename, token[0], smart_case);
         while (it.next()) |start_index| {
             if (scanToEnd(filename, token[1..], start_index, smart_case)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
-                    range.* = .{ .start = match.start + offs, .end = match.end + offs };
                 }
             } else break;
         }
@@ -230,7 +225,6 @@ pub fn rankToken(
         if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
-                range.* = .{ .start = match.start, .end = match.end };
             }
         } else break;
     }
@@ -239,44 +233,42 @@ pub fn rankToken(
 }
 
 test "rankToken" {
-    var range: Range = .{};
-
     // TODO: cannot easily test smart case yet because the boolean here
     // depends on the token being lower case. If rankToken is to be a public function
     // then we should resolve this.
 
     // plain string matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "b", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("aaa", null, "aab", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("abbba", null, "abab", &range, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", null, "", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "b", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("aaa", null, "aab", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("abbba", null, "abab", false));
 
-    try testing.expect(rankToken("a", null, "a", &range, false) != null);
-    try testing.expect(rankToken("abc", null, "abc", &range, false) != null);
-    try testing.expect(rankToken("aaabbbccc", null, "abc", &range, false) != null);
-    try testing.expect(rankToken("azbycx", null, "x", &range, false) != null);
-    try testing.expect(rankToken("azbycx", null, "ax", &range, false) != null);
-    try testing.expect(rankToken("a", null, "a", &range, false) != null);
+    try testing.expect(rankToken("a", null, "a", false) != null);
+    try testing.expect(rankToken("abc", null, "abc", false) != null);
+    try testing.expect(rankToken("aaabbbccc", null, "abc", false) != null);
+    try testing.expect(rankToken("azbycx", null, "x", false) != null);
+    try testing.expect(rankToken("azbycx", null, "ax", false) != null);
+    try testing.expect(rankToken("a", null, "a", false) != null);
 
     // file name matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", "", "", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a", "a", "b", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("c/a", "a", "b", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "z", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "fext.", &range, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a/b/c", "c", "d", &range, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", "", "", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/a", "a", "b", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("c/a", "a", "b", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "z", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "fext.", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/a/b/c", "c", "d", false));
 
-    try testing.expect(rankToken("/b", "b", "b", &range, false) != null);
-    try testing.expect(rankToken("/a/b/c", "c", "c", &range, false) != null);
-    try testing.expect(rankToken("/file.ext", "file.ext", "ext", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "file", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "to", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "path", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", &range, false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", &range, false) != null);
+    try testing.expect(rankToken("/b", "b", "b", false) != null);
+    try testing.expect(rankToken("/a/b/c", "c", "c", false) != null);
+    try testing.expect(rankToken("/file.ext", "file.ext", "ext", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "file", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "to", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "path", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false) != null);
 }
 
 const Match = struct {
