@@ -72,13 +72,6 @@ test "collectCandidates excess whitespace" {
     try testing.expectEqualStrings("fourth", candidates[3].str);
 }
 
-fn hasUpper(query: []const u8) bool {
-    for (query) |*c| {
-        if (std.ascii.isUpper(c.*)) return true;
-    }
-    return false;
-}
-
 /// rank each candidate against the query
 ///
 /// returns a sorted slice of Candidates that match the query ready for display
@@ -86,26 +79,24 @@ fn hasUpper(query: []const u8) bool {
 pub fn rankCandidates(
     allocator: std.mem.Allocator,
     candidates: []Candidate,
-    query: []const u8,
+    tokens: [][]const u8,
     keep_order: bool,
     plain: bool,
+    smart_case: bool,
 ) ![]Candidate {
     var ranked = ArrayList(Candidate).init(allocator);
-    const smart_case = !hasUpper(query);
 
-    if (query.len == 0) {
+    if (tokens.len == 0) {
         for (candidates) |candidate| {
             try ranked.append(candidate);
         }
         return ranked.toOwnedSlice();
     }
 
-    var query_tokens = try splitQuery(allocator, query);
-    defer allocator.free(query_tokens);
     for (candidates) |candidate| {
         // TODO: is this copy needed?
         var c = candidate;
-        if (rankCandidate(&c, query_tokens, smart_case, plain)) {
+        if (rankCandidate(&c, tokens, smart_case, plain)) {
             try ranked.append(c);
         }
     }
@@ -115,18 +106,6 @@ pub fn rankCandidates(
     }
 
     return ranked.toOwnedSlice();
-}
-
-/// split the query on spaces and return a slice of query tokens
-fn splitQuery(allocator: std.mem.Allocator, query: []const u8) ![][]const u8 {
-    var tokens = ArrayList([]const u8).init(allocator);
-
-    var it = std.mem.tokenize(u8, query, " ");
-    while (it.next()) |token| {
-        try tokens.append(token);
-    }
-
-    return tokens.toOwnedSlice();
 }
 
 const indexOfCaseSensitive = std.mem.indexOfScalarPos;
@@ -269,6 +248,44 @@ test "rankToken" {
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", false) != null);
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", false) != null);
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false) != null);
+}
+
+pub fn highlightToken(
+    str: []const u8,
+    filenameOrNull: ?[]const u8,
+    token: []const u8,
+    smart_case: bool,
+) Range {
+    var best_rank: ?f64 = null;
+    var range: Range = .{};
+
+    // highlight on the filename if requested
+    if (filenameOrNull) |filename| {
+        const offs = str.len - filename.len;
+        var it = IndexIterator.init(filename, token[0], smart_case);
+        while (it.next()) |start_index| {
+            if (scanToEnd(filename, token[1..], start_index, smart_case)) |match| {
+                if (best_rank == null or match.rank < best_rank.?) {
+                    best_rank = match.rank;
+                    range = .{ .start = match.start + offs, .end = match.end + offs };
+                }
+            } else break;
+        }
+        if (best_rank != null) return range;
+    }
+
+    // highlight the full string if requested or if no match was found on the filename
+    var it = IndexIterator.init(str, token[0], smart_case);
+    while (it.next()) |start_index| {
+        if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
+            if (best_rank == null or match.rank < best_rank.?) {
+                best_rank = match.rank;
+                range = .{ .start = match.start, .end = match.end };
+            }
+        } else break;
+    }
+
+    return range;
 }
 
 const Match = struct {

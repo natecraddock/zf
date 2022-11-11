@@ -221,7 +221,12 @@ pub fn main() anyerror!void {
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.skip_ui) {
-        const filtered = try filter.rankCandidates(allocator, candidates, config.query, config.keep_order, config.plain);
+        // Use the heap here rather than an array on the stack. Testing showed that this is actually
+        // faster, likely due to locality with other heap-alloced data used in the algorithm.
+        var tokens_buf = try allocator.alloc([]const u8, 16);
+        const tokens = ui.splitQuery(tokens_buf, config.query);
+        const smart_case = !ui.hasUpper(config.query);
+        const filtered = try filter.rankCandidates(allocator, candidates, tokens, config.keep_order, config.plain, smart_case);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});

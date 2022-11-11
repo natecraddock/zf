@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
 const File = std.fs.File;
 const BufferedWriter = std.io.BufferedWriter;
+const Range = filter.Range;
 
 const filter = @import("filter.zig");
 
@@ -212,17 +213,17 @@ const HighlightSlice = struct {
 const Slicer = struct {
     index: usize = 0,
     str: []const u8,
-    ranges: []filter.Range,
+    ranges: []Range,
 
-    fn init(str: []const u8, ranges: []filter.Range) Slicer {
+    fn init(str: []const u8, ranges: []Range) Slicer {
         return .{
             .str = str,
             .ranges = ranges,
         };
     }
 
-    fn nextRange(slicer: *Slicer) ?*filter.Range {
-        var next_range: ?*filter.Range = null;
+    fn nextRange(slicer: *Slicer) ?*Range {
+        var next_range: ?*Range = null;
         for (slicer.ranges) |*r| {
             if (r.start >= slicer.index) {
                 if (next_range == null or r.start < next_range.?.start) {
@@ -260,26 +261,51 @@ const Slicer = struct {
     }
 };
 
-inline fn drawCandidate(terminal: *Terminal, candidate: Candidate, width: usize, selected: bool) void {
+fn computeRanges(
+    str: []const u8,
+    filenameOrNull: ?[]const u8,
+    ranges: []Range,
+    tokens: [][]const u8,
+    smart_case: bool,
+) []Range {
+    for (tokens) |token, i| {
+        ranges[i] = filter.highlightToken(str, filenameOrNull, token, smart_case);
+    }
+    return ranges[0..tokens.len];
+}
+
+inline fn drawCandidate(
+    terminal: *Terminal,
+    candidate: Candidate,
+    tokens: [][]const u8,
+    width: usize,
+    selected: bool,
+    smart_case: bool,
+    plain: bool,
+) void {
     if (selected) terminal.sgr(.REVERSE);
     defer terminal.sgr(.RESET);
+
+    var ranges_buf: [16]Range = undefined;
+    const filename = if (plain) null else std.fs.path.basename(candidate.str);
+    const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, smart_case);
 
     const str = candidate.str[0..std.math.min(width, candidate.str.len)];
 
     // no highlights, just draw the string
-    // if (candidate.ranges == null or terminal.no_color) {
+    if (ranges.len == 0 or terminal.no_color) {
         _ = terminal.writer.write(str) catch unreachable;
-    // } else {
-    //     var slicer = Slicer.init(str, candidate.ranges.?);
-    //     while (slicer.next()) |slice| {
-    //         if (slice.highlight) {
-    //             terminal.sgr(.FG_CYAN);
-    //         } else {
-    //             terminal.sgr(.FG_DEFAULT);
-    //         }
-    //         terminal.writeBytes(slice.str);
-    //     }
-    // }
+    } else {
+        var slicer = Slicer.init(str, ranges);
+        while (slicer.next()) |slice| {
+            if (slice.highlight) {
+                terminal.sgr(.FG_CYAN);
+            } else {
+                terminal.sgr(.FG_DEFAULT);
+            }
+            terminal.writeBytes(slice.str);
+        }
+    }
 }
 
 inline fn numDigits(number: usize) u16 {
@@ -287,7 +313,16 @@ inline fn numDigits(number: usize) u16 {
     return @intCast(u16, std.math.log10(number) + 1);
 }
 
-fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []Candidate, total_candidates: usize) !void {
+fn draw(
+    terminal: *Terminal,
+    state: *State,
+    query: []const u8,
+    tokens: [][]const u8,
+    candidates: []Candidate,
+    total_candidates: usize,
+    smart_case: bool,
+    plain: bool,
+) !void {
     const width = terminal.windowSize().?.x;
 
     // draw the candidates
@@ -295,7 +330,7 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     while (line < terminal.height) : (line += 1) {
         terminal.cursorDown(1);
         terminal.clearLine();
-        if (line < candidates.len) drawCandidate(terminal, candidates[line], width, line == state.selected);
+        if (line < candidates.len) drawCandidate(terminal, candidates[line], tokens, width, line == state.selected, smart_case, plain);
     }
     terminal.sgr(.RESET);
     terminal.cursorUp(terminal.height);
@@ -303,11 +338,11 @@ fn draw(terminal: *Terminal, state: *State, query: ArrayList(u8), candidates: []
     // draw the prompt
     const prompt_width = state.prompt.len;
     terminal.clearLine();
-    terminal.print("{s}{s}", .{ state.prompt, query.items[0..std.math.min(width - prompt_width, query.items.len)] });
+    terminal.print("{s}{s}", .{ state.prompt, query[0..std.math.min(width - prompt_width, query.len)] });
 
     // draw info if there is room
     const separator_width = 1;
-    const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.items.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
+    const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
     if (spacing >= 1) {
         terminal.cursorRight(@intCast(usize, spacing));
         terminal.print("{}/{}", .{ candidates.len, total_candidates });
@@ -407,6 +442,25 @@ fn actionDeleteWord(query: *ArrayList(u8), cursor: *usize) void {
     }
 }
 
+/// split the query on spaces and return a slice of query tokens
+pub fn splitQuery(query_tokens: [][]const u8, query: []const u8) [][]const u8 {
+    var index: u8 = 0;
+    var it = std.mem.tokenize(u8, query, " ");
+    while (it.next()) |token| : (index += 1) {
+        if (index == query_tokens.len) break;
+        query_tokens[index] = token;
+    }
+
+    return query_tokens[0..index];
+}
+
+pub fn hasUpper(query: []const u8) bool {
+    for (query) |c| {
+        if (std.ascii.isUpper(c)) return true;
+    }
+    return false;
+}
+
 pub fn run(
     allocator: std.mem.Allocator,
     terminal: *Terminal,
@@ -436,6 +490,10 @@ pub fn run(
     var old_state = state;
     var old_query = try allocator.alloc(u8, query.items.len);
 
+    var tokens_buf = try allocator.alloc([]const u8, 16);
+    var tokens: [][]const u8 = splitQuery(tokens_buf, query.items);
+    var smart_case: bool = !hasUpper(query.items);
+
     var redraw = true;
     while (true) {
         // did the query change?
@@ -444,7 +502,10 @@ pub fn run(
             old_query = try allocator.alloc(u8, query.items.len);
             std.mem.copy(u8, old_query, query.items);
 
-            filtered = try filter.rankCandidates(allocator, candidates, query.items, keep_order, plain);
+            tokens = splitQuery(tokens_buf, query.items);
+            smart_case = !hasUpper(query.items);
+
+            filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, smart_case);
             redraw = true;
             state.selected = 0;
         }
@@ -452,7 +513,7 @@ pub fn run(
         // did the selection move?
         if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
             old_state = state;
-            try draw(terminal, &state, query, filtered, candidates.len);
+            try draw(terminal, &state, query.items, tokens, filtered, candidates.len, smart_case, plain);
             redraw = false;
         }
 
