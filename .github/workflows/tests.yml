@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Clone zf
+      uses: actions/checkout@v3
+
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v1
+      with:
+        version: 0.10.0
+
+    - name: Run tests
+      run: zig build test
