@@ -1,5 +1,7 @@
 # zf
 
+[![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml)
+
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
 [Docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md).
 
