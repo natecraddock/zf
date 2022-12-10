@@ -1,5 +1,29 @@
 # master
 
+# 0.6.0
+
+This release is focused on small optimizations, refactors, and using zf as a library. Because zf is now packaged as a Zig library, it makes sense to switch back to semantic versioning which makes this version 0.6.0 rather than 0.6. This release also updates the source code to support Zig 0.10.0.
+
+While refactoring zf to be more easily consumed by a library, I designed the library to require zero allocations and be passed external slices of memory. Alongside this I also added a restriction to zf as a cli tool. The number of space-separated tokens in the query is now limited to 16. This seems like a safe upper limit, but can be raised if needed.
+
+* **library**: package zf as a Zig library
+  ([47467d](https://github.com/natecraddock/zf/commit/47467d))
+  ([f9f17d](https://github.com/natecraddock/zf/commit/f9f17d))
+
+  Adds a Zig package exposing the zf ranking and highlight functions. Also updates the existing C library to match the Zig library.
+
+  See the [docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for instructions on using Zf as a library.
+
+* **refactor**: reduce size of the Candidate struct and reorganize code
+  ([ee2d18](https://github.com/natecraddock/zf/commit/ee2d18))
+  ([f88c76](https://github.com/natecraddock/zf/commit/f88c76))
+  ([426f4d](https://github.com/natecraddock/zf/commit/426f4d))
+
+  A small optimization that reduces the size of the Candidate struct. This involved a restructure of the ranking algorithm, separating ranking and highlighting into two separate functions. This resulted in a small but measurable performance increase.
+
+* **ci**: zf tests are now run with GitHub actions for pushes and PRs
+  ([41eaa5](https://github.com/natecraddock/zf/commit/41eaa5))
+
 # 0.5
 
 This smaller release fixes a few bugs and adds support for a few environment variables.

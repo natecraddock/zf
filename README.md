@@ -15,7 +15,7 @@ zf is a commandline fuzzy finder that prioritizes matches on filenames.
 * simple TUI interface that highlights matched ranges in results
 * smartcase: when the query contains no uppercase letters case-insensitive
   matching is used
-* `libzf` library for integration with other projects
+* the ranking algorithm is packaged as both Zig and C libraries for integration with other projects
 
 ## Installation
 

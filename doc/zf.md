@@ -8,7 +8,7 @@ zf is a simple, general-purpose fuzzy finder that prioritizes matches on filenam
 
 zf reads a list of newline separated strings on stdin and displays an interactive interface. Pressing enter outputs the selected line on stdout. Text may be entered to filter the list of strings.
 
-Each whitespace-separated term in the query string is used separately to narrow down the search results. For example, searching for "init config" will select all results that match both "init" and "config".
+Each whitespace-separated term in the query string is used separately to narrow down the search results. For example, searching for "init config" will select all results that match both "init" and "config". Note that the query is restricted to a maximum of 16 whitespace-separated tokens.
 
 Matching is case insensitive unless an uppercase letter is found in the query.
 
