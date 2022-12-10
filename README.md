@@ -32,6 +32,10 @@ $ brew tap natecraddock/taps https://github.com/natecraddock/taps
 $ brew install zf
 ```
 
+### Binaries
+
+Each release has binaries attached for macOS and Linux.
+
 ### Building from source
 
 zf targets the latest stable release of Zig. Compile with `zig build
@@ -113,17 +117,8 @@ day-to-day fuzzy finding!
 
 ### Roadmap
 
-#### 0.6
-* utf-8 support
+I previously had specific goals for future versions listed here. Rather than constrain myself, I will only list some possible future improvements
 
-#### 0.7
-* packaging (homebrew, debian, etc)
-* further improvements to ranking
-
-#### 1.0
-* stabilized ranking algorithm
-
-  I want to give the zf algorithm some time to settle and get feedback from any
-  who use zf before reaching a stable 1.0. Any versions before 1.0 should be
-  considered stable in *behavior*, so there isn't any reason to avoid using zf
-  before 1.0.
+* utf-8 unicode support
+* vectorization optimizations
+* small ranking improvements
