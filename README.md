@@ -3,7 +3,6 @@
 [![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml)
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
-[Docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md).
 
 ![zf](https://user-images.githubusercontent.com/7967463/155037380-79f61539-7d20-471b-8040-6ee7d0e4b6ea.gif)
 
@@ -16,6 +15,11 @@ zf is a commandline fuzzy finder that prioritizes matches on filenames.
 * smartcase: when the query contains no uppercase letters case-insensitive
   matching is used
 * the ranking algorithm is packaged as both Zig and C libraries for integration with other projects
+
+## Docs
+
+* [Usage Documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md)
+* [Library Documentation](https://github.com/natecraddock/zf/blob/master/doc/lib.md)
 
 ## Installation
 
@@ -34,7 +38,7 @@ $ brew install zf
 
 ### Binaries
 
-Each release has binaries attached for macOS and Linux.
+Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries attached for macOS and Linux.
 
 ### Building from source
 
