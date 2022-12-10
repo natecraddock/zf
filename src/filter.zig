@@ -10,7 +10,8 @@ pub const Candidate = struct {
     rank: f64 = 0,
 };
 
-pub const Range = struct {
+/// Packed so it can be exported via the C ABI
+pub const Range = packed struct {
     start: usize = 0,
     end: usize = 0,
 };

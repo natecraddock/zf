@@ -287,4 +287,5 @@ pub fn readAll(allocator: std.mem.Allocator, reader: *std.fs.File.Reader) ![]u8 
 test {
     _ = @import("filter.zig");
     _ = @import("lib.zig");
+    _ = @import("clib.zig");
 }
