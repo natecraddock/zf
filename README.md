@@ -32,7 +32,6 @@ An [AUR package](https://aur.archlinux.org/packages/zf/) is available.
 Install with Homebrew
 
 ```
-$ brew tap natecraddock/taps https://github.com/natecraddock/taps
 $ brew install zf
 ```
 
