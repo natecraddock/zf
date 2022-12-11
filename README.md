@@ -1,6 +1,7 @@
 # zf
 
-[![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml)
+[![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml) [![Packaging status](https://repology.org/badge/tiny-repos/zf.svg)](https://repology.org/project/zf/versions)
+
 
 zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
@@ -125,3 +126,4 @@ I previously had specific goals for future versions listed here. Rather than con
 * utf-8 unicode support
 * vectorization optimizations
 * small ranking improvements
+* better cli argument parsing
