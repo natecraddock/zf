@@ -43,8 +43,9 @@ pub const Terminal = struct {
     max_height: usize,
 
     no_color: bool,
+    highlight_color: SGRAttribute,
 
-    pub fn init(max_height: usize, no_color: bool) !Terminal {
+    pub fn init(max_height: usize, highlight_color: SGRAttribute, no_color: bool) !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
 
         // store original terminal settings to restore later
@@ -62,6 +63,7 @@ pub const Terminal = struct {
             .termios = termios,
             .raw_termios = raw_termios,
             .max_height = max_height,
+            .highlight_color = highlight_color,
             .no_color = no_color,
         };
     }
@@ -314,7 +316,7 @@ inline fn drawCandidate(
         var slicer = Slicer.init(str, ranges);
         while (slicer.next()) |slice| {
             if (slice.highlight) {
-                terminal.sgr(.cyan);
+                terminal.sgr(terminal.highlight_color);
             } else {
                 terminal.sgr(.default);
             }

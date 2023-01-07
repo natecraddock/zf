@@ -1,9 +1,11 @@
-const std = @import("std");
+const eql = std.mem.eql;
 const heap = std.heap;
 const io = std.io;
+const std = @import("std");
 const testing = std.testing;
 
 const ArrayList = std.ArrayList;
+const SGRAttribute = ui.SGRAttribute;
 
 const filter = @import("filter.zig");
 const ui = @import("ui.zig");
@@ -41,7 +43,6 @@ const Config = struct {
 fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
     var config: Config = .{};
 
-    const eql = std.mem.eql;
     var skip = false;
     for (args[1..]) |arg, i| {
         if (skip) {
@@ -239,8 +240,16 @@ pub fn main() anyerror!void {
         const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
+        const highlight_color: SGRAttribute = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
+            inline for (std.meta.fields(SGRAttribute)) |field| {
+                if (eql(u8, value, field.name)) {
+                    break :blk @intToEnum(SGRAttribute, field.value);
+                }
+            }
+            break :blk .cyan;
+        } else |_| .cyan;
 
-        var terminal = try ui.Terminal.init(@min(candidates.len, config.lines), no_color);
+        var terminal = try ui.Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
         var selected = try ui.run(
             allocator,
             &terminal,
