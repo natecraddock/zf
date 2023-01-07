@@ -10,12 +10,27 @@ const Range = filter.Range;
 const filter = @import("filter.zig");
 
 // Select Graphic Rendition (SGR) attributes
-const Attribute = enum(u8) {
-    RESET = 0,
-    REVERSE = 7,
+pub const SGRAttribute = enum(u8) {
+    reset = 0,
+    reverse = 7,
 
-    FG_CYAN = 36,
-    FG_DEFAULT = 39,
+    black = 30,
+    red = 31,
+    green = 32,
+    yellow = 33,
+    blue = 34,
+    magenta = 35,
+    cyan = 36,
+    white = 37,
+    default = 39,
+    bright_black = 90,
+    bright_red = 91,
+    bright_green = 92,
+    bright_yellow = 93,
+    bright_blue = 94,
+    bright_magenta = 95,
+    bright_cyan = 96,
+    bright_white = 97,
 };
 
 pub const Terminal = struct {
@@ -114,7 +129,7 @@ pub const Terminal = struct {
         self.write(.{ col, 'G' });
     }
 
-    pub fn sgr(self: *Terminal, code: Attribute) void {
+    pub fn sgr(self: *Terminal, code: SGRAttribute) void {
         self.write(.{ @enumToInt(code), 'm' });
     }
 
@@ -283,8 +298,8 @@ inline fn drawCandidate(
     smart_case: bool,
     plain: bool,
 ) void {
-    if (selected) terminal.sgr(.REVERSE);
-    defer terminal.sgr(.RESET);
+    if (selected) terminal.sgr(.reverse);
+    defer terminal.sgr(.reset);
 
     var ranges_buf: [16]Range = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
@@ -299,9 +314,9 @@ inline fn drawCandidate(
         var slicer = Slicer.init(str, ranges);
         while (slicer.next()) |slice| {
             if (slice.highlight) {
-                terminal.sgr(.FG_CYAN);
+                terminal.sgr(.cyan);
             } else {
-                terminal.sgr(.FG_DEFAULT);
+                terminal.sgr(.default);
             }
             terminal.writeBytes(slice.str);
         }
@@ -332,7 +347,7 @@ fn draw(
         terminal.clearLine();
         if (line < candidates.len) drawCandidate(terminal, candidates[line], tokens, width, line == state.selected, smart_case, plain);
     }
-    terminal.sgr(.RESET);
+    terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
 
     // draw the prompt
