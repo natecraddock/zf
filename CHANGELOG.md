@@ -1,5 +1,15 @@
 # master
 
+* **feat**: add ZF_HIGHLIGHT environment variable to set highlight color
+  ([3cf713](https://github.com/natecraddock/zf/commit/3cf713))
+
+  Adds a new environment variable to set the highlight color. Valid colors are: black, red, green, yellow, blue, magenta, cyan, white, bright_black, bright_red, bright_green, bright_yellow, bright_blue, bright_magenta, bright_cyan, and bright_white
+
+* **fix**: escape ANSI codes in ZF_PROMPT
+  ([7d32ad](https://github.com/natecraddock/zf/commit/7d32ad))
+
+  This adds SGR ANSI escape code handling to ZF_PROMPT. It now correctly calculates the width of the prompt when ANSI codes are included. Currently only supports the SGR codes
+
 # 0.6.0
 
 This release is focused on small optimizations, refactors, and using zf as a library. Because zf is now packaged as a Zig library, it makes sense to switch back to semantic versioning which makes this version 0.6.0 rather than 0.6. This release also updates the source code to support Zig 0.10.0.
