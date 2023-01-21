@@ -28,11 +28,13 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 ## ENV VARIABLES
 
-`ZF_PROMPT` : Override the default `> ` prompt by assigning a string to this variable. For example `export ZF_PROMPT="$ "`.
+`ZF_PROMPT`: Override the default `> ` prompt by assigning a string to this variable. For example `export ZF_PROMPT="$ "`.
 
-`ZF_VI_MODE` : When this variable is present and not empty `ctrl+k` moves up a line. When disabled `ctrl+k` deletes from the cursor to the end of line
+`ZF_HIGHLIGHT`: Set the color used to highlight matches. Valid colors are: black, red, green, yellow, blue, magenta, cyan, white, bright_black, bright_red, bright_green, bright_yellow, bright_blue, bright_magenta, bright_cyan, and bright_white. The default color is cyan.
 
-`NO_COLOR` : Disables colors. See https://no-color.org
+`ZF_VI_MODE`: When this variable is present and not empty `ctrl+k` moves up a line. When disabled `ctrl+k` deletes from the cursor to the end of line.
+
+`NO_COLOR`: Disables colors. See https://no-color.org.
 
 ## COMMANDS
 
