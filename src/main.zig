@@ -250,7 +250,7 @@ pub fn main() anyerror!void {
         } else |_| .cyan;
 
         var terminal = try ui.Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
-        var selected = try ui.run(
+        var selected = ui.run(
             allocator,
             &terminal,
             candidates,
@@ -258,7 +258,14 @@ pub fn main() anyerror!void {
             config.plain,
             prompt_str,
             vi_mode,
-        );
+        ) catch |err| switch (err) {
+            error.UnknownANSIEscape => {
+                try stderr.print("error: unknown ANSI escape sequence in ZF_PROMPT", .{});
+                std.process.exit(2);
+            },
+            else => return err,
+        };
+
         try ui.cleanUp(&terminal);
         terminal.deinit();
 
@@ -294,7 +301,8 @@ pub fn readAll(allocator: std.mem.Allocator, reader: *std.fs.File.Reader) ![]u8 
 }
 
 test {
+    _ = @import("clib.zig");
     _ = @import("filter.zig");
     _ = @import("lib.zig");
-    _ = @import("clib.zig");
+    _ = @import("ui.zig");
 }

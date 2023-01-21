@@ -1,5 +1,6 @@
 const std = @import("std");
 const system = std.os.system;
+const testing = std.testing;
 
 const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
@@ -220,6 +221,7 @@ const State = struct {
     cursor: usize,
     selected: usize,
     prompt: []const u8,
+    prompt_width: usize,
 };
 
 const HighlightSlice = struct {
@@ -353,13 +355,12 @@ fn draw(
     terminal.cursorUp(terminal.height);
 
     // draw the prompt
-    const prompt_width = state.prompt.len;
     terminal.clearLine();
-    terminal.print("{s}{s}", .{ state.prompt, query[0..std.math.min(width - prompt_width, query.len)] });
+    terminal.print("{s}{s}", .{ state.prompt, query[0..std.math.min(width - state.prompt_width, query.len)] });
 
     // draw info if there is room
     const separator_width = 1;
-    const spacing = @intCast(i32, width) - @intCast(i32, prompt_width + query.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
+    const spacing = @intCast(i32, width) - @intCast(i32, state.prompt_width + query.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
     if (spacing >= 1) {
         terminal.cursorRight(@intCast(usize, spacing));
         terminal.print("{}/{}", .{ candidates.len, total_candidates });
@@ -367,7 +368,7 @@ fn draw(
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
-    terminal.cursorRight(std.math.min(width - 1, state.cursor + prompt_width));
+    terminal.cursorRight(std.math.min(width - 1, state.cursor + state.prompt_width));
 
     try terminal.writer.flush();
 }
@@ -478,6 +479,55 @@ pub fn hasUpper(query: []const u8) bool {
     return false;
 }
 
+/// Escapes ANSI escape sequences in a given string and returns a new owned slice of bytes
+/// representing the non-ANSI escape characters
+///
+/// Is not intended to cover the entirety of ANSI. Only a reasonable subset. More escaped
+/// codes can be added as needed.
+/// Currently escapes SGR sequences (\x1b[ ... m)
+fn escapeANSI(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
+    const EscapeState = enum{
+        esc,
+        left_bracket,
+        sgr,
+    };
+
+    var buf = try ArrayList(u8).initCapacity(allocator, str.len);
+    var state: EscapeState = .esc;
+    for (str) |byte| {
+        switch (state) {
+            .esc => switch (byte) {
+                0x1b => state = .left_bracket,
+                else => buf.appendAssumeCapacity(byte),
+            },
+            .left_bracket => switch (byte) {
+                '[' => state = .sgr,
+                else => state = .esc,
+            },
+            .sgr => switch (byte) {
+                '0'...'9', ';' => continue,
+                'm' => state = .esc,
+                else => return error.UnknownANSIEscape,
+            },
+        }
+    }
+
+    return buf.toOwnedSlice();
+}
+
+fn testEscapeANSI(expected: []const u8, input: []const u8) !void {
+    const escaped = try escapeANSI(testing.allocator, input);
+    defer testing.allocator.free(escaped);
+    try testing.expectEqualStrings(expected, escaped);
+}
+
+test "escape ANSI codes" {
+    try testEscapeANSI("", "\x1b[0m");
+    try testEscapeANSI("str", "\x1b[30mstr");
+    try testEscapeANSI("contents", "\x1b[31mcontents\x1b[0m");
+    try testEscapeANSI("abcd", "a\x1b[31mb\x1b[32mc\x1b[33md\x1b[0m");
+}
+
 pub fn run(
     allocator: std.mem.Allocator,
     terminal: *Terminal,
@@ -490,10 +540,13 @@ pub fn run(
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
+    const prompt_width = (try escapeANSI(allocator, prompt_str)).len;
+
     var state = State{
         .cursor = 0,
         .selected = 0,
         .prompt = prompt_str,
+        .prompt_width = prompt_width,
     };
 
     // ensure enough room to draw all lines of output by drawing blank lines,
