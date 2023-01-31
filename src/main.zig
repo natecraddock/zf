@@ -3,8 +3,10 @@ const heap = std.heap;
 const io = std.io;
 const std = @import("std");
 const testing = std.testing;
+const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
+const Normalizer = ziglyph.Normalizer;
 const SGRAttribute = ui.SGRAttribute;
 
 const filter = @import("filter.zig");
@@ -213,9 +215,15 @@ pub fn main() anyerror!void {
         std.process.exit(0);
     }
 
+    var normalizer = try Normalizer.init(allocator);
+    defer normalizer.deinit();
+
     // read all lines or exit on out of memory
-    var stdin = io.getStdIn().reader();
-    const buf = try readAll(allocator, &stdin);
+    const buf = blk: {
+        var stdin = io.getStdIn().reader();
+        const buf = try readAll(allocator, &stdin);
+        break :blk (try normalizer.nfd(allocator, buf)).slice;
+    };
 
     const delimiter = '\n';
     var candidates = try filter.collectCandidates(allocator, buf, delimiter);
