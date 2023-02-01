@@ -539,7 +539,7 @@ pub fn run(
     var query = ArrayList(u8).init(allocator);
     defer query.deinit();
 
-    const prompt_width = (try escapeANSI(allocator, prompt_str)).len;
+    const prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half);
 
     var state = State{
         .cursor = 0,
