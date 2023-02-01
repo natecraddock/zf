@@ -1,14 +1,15 @@
+const dw = ziglyph.display_width;
+const filter = @import("filter.zig");
 const std = @import("std");
 const system = std.os.system;
 const testing = std.testing;
+const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
 const File = std.fs.File;
 const BufferedWriter = std.io.BufferedWriter;
 const Range = filter.Range;
-
-const filter = @import("filter.zig");
 
 // Select Graphic Rendition (SGR) attributes
 pub const SGRAttribute = enum(u8) {
@@ -153,7 +154,7 @@ pub const Terminal = struct {
 };
 
 const Key = union(enum) {
-    character: u8,
+    byte: u8,
     control: u8,
     esc,
     up,
@@ -211,10 +212,8 @@ fn readKey(terminal: *Terminal) Key {
     // control chars
     if (std.ascii.isCntrl(byte)) return .{ .control = byte };
 
-    // ascii chars
-    if (std.ascii.isPrint(byte)) return .{ .character = byte };
-
-    return .none;
+    // may eventually need to check if the character is printable
+    return .{ .byte = byte };
 }
 
 const State = struct {
@@ -417,7 +416,7 @@ fn ctrlToAction(key: u8, vi_mode: bool) Action {
 
 fn keyToAction(key: Key, vi_mode: bool) Action {
     return switch (key) {
-        .character => |c| .{ .byte = c },
+        .byte => |c| .{ .byte = c },
         .control => |c| ctrlToAction(c, vi_mode),
         .backspace => .backspace,
         .delete => .delete,
