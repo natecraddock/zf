@@ -7,9 +7,11 @@ const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
 const Normalizer = ziglyph.Normalizer;
-const SGRAttribute = ui.SGRAttribute;
+const SGRAttribute = term.SGRAttribute;
+const Terminal = term.Terminal;
 
 const filter = @import("filter.zig");
+const term = @import("term.zig");
 const ui = @import("ui.zig");
 
 const version = "0.7.0-dev";
@@ -257,7 +259,7 @@ pub fn main() anyerror!void {
             break :blk .cyan;
         } else |_| .cyan;
 
-        var terminal = try ui.Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
+        var terminal = try Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
         var selected = ui.run(
             allocator,
             &terminal,
@@ -274,8 +276,7 @@ pub fn main() anyerror!void {
             else => return err,
         };
 
-        try ui.cleanUp(&terminal);
-        terminal.deinit();
+        try terminal.deinit();
 
         if (selected) |str| {
             try stdout.print("{s}\n", .{str});
