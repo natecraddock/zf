@@ -29,7 +29,7 @@ pub fn build(b: *std.build.Builder) void {
     run_step.dependOn(&run_cmd.step);
 
     var exe_tests = b.addTest("src/main.zig");
-    exe_tests.addPackagePath("ziglyph", "libs/ziglyph/src/ziglyph.zig");
+    exe_tests.addPackagePath("ziglyph", "lib/ziglyph/src/ziglyph.zig");
     exe_tests.setBuildMode(mode);
 
     const tests = b.step("test", "Run tests");
