@@ -1,5 +1,6 @@
 const std = @import("std");
 const system = std.os.system;
+const ziglyph = @import("ziglyph");
 
 const BufferedWriter = std.io.BufferedWriter;
 const File = std.fs.File;
@@ -26,6 +27,20 @@ pub const SGRAttribute = enum(u8) {
     bright_magenta = 95,
     bright_cyan = 96,
     bright_white = 97,
+};
+
+pub const InputBuffer = union(enum) {
+    str: []u8,
+    control: u8,
+    esc,
+    up,
+    down,
+    left,
+    right,
+    backspace,
+    delete,
+    enter,
+    none,
 };
 
 pub const Terminal = struct {
@@ -153,5 +168,76 @@ pub const Terminal = struct {
         }
 
         return WinSize{ .x = size.ws_col, .y = size.ws_row };
+    }
+
+    // NOTE: this function assumes the input is either a stream of printable/whitespace
+    // codepoints, or a control sequence. I don't expect the input to zf to be a mixed
+    // buffer. If that is the case this will need to be refactored.
+    pub fn read(self: *Terminal, buf: []u8) !InputBuffer {
+        const reader = self.tty.reader();
+        defer self.nodelay(false);
+
+        var index: usize = 0;
+        // Ensure at least 4 bytes of space in the buffer so it is safe
+        // to read a codepoint into it
+        while (index < buf.len - 3) {
+            const cp = ziglyph.readCodePoint(reader) catch |err| switch (err) {
+                // Ignore invalid codepoints
+                error.InvalidUtf8 => continue,
+                else => return err,
+            };
+            self.nodelay(true);
+            if (cp) |c| {
+                // An escape sequence start
+                if (ziglyph.isControl(c)) {
+                    return self.readEscapeSequence(c);
+                }
+
+                // Assert the codepoint is valid because we just read it
+                index += std.unicode.utf8Encode(c, buf[index..]) catch unreachable;
+            } else break;
+        }
+
+        return .{ .str = buf[0..index] };
+    }
+
+    fn readEscapeSequence(self: *Terminal, cp: u21) InputBuffer {
+        const reader = self.tty.reader();
+
+        // escape sequences
+        switch (cp) {
+            // esc
+            0x1b => {
+                var seq: [2]u8 = undefined;
+                seq[0] = reader.readByte() catch return .esc;
+                seq[1] = reader.readByte() catch return .esc;
+
+                // DECCKM mode sends \x1bO* instead of \x1b[*
+                if (seq[0] == '[' or seq[0] == 'O') {
+                    return switch (seq[1]) {
+                        'A' => .up,
+                        'B' => .down,
+                        'C' => .right,
+                        'D' => .left,
+                        '3' => {
+                            const byte = reader.readByte() catch return .esc;
+                            if (byte == '~') return .delete;
+                            return .esc;
+                        },
+                        else => .esc,
+                    };
+                }
+
+                return .esc;
+            },
+            '\r' => return .enter,
+            127 => return .backspace,
+            else => {},
+        }
+
+        // keys pressed while holding control will always be below 0x20
+        if (cp <= 0x1f) return .{ .control = @intCast(u8, cp & 0x1f) };
+
+        return .none;
     }
 };

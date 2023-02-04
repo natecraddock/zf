@@ -12,69 +12,6 @@ const Terminal = term.Terminal;
 
 const term = @import("term.zig");
 
-const Key = union(enum) {
-    byte: u8,
-    control: u8,
-    esc,
-    up,
-    down,
-    left,
-    right,
-    backspace,
-    delete,
-    enter,
-    none,
-};
-
-fn readDelete(reader: anytype) Key {
-    const byte = reader.readByte() catch return .esc;
-    if (byte == '~') return .delete;
-    return .esc;
-}
-
-fn readKey(terminal: *Terminal) Key {
-    const reader = terminal.tty.reader();
-
-    // reading may fail (timeout)
-    var byte = reader.readByte() catch return .none;
-
-    // escape
-    if (byte == '\x1b') {
-        terminal.nodelay(true);
-        defer terminal.nodelay(false);
-
-        var seq: [2]u8 = undefined;
-        seq[0] = reader.readByte() catch return .esc;
-        seq[1] = reader.readByte() catch return .esc;
-
-        // DECCKM mode sends \x1bO* instead of \x1b[*
-        if (seq[0] == '[' or seq[0] == 'O') {
-            return switch (seq[1]) {
-                'A' => .up,
-                'B' => .down,
-                'C' => .right,
-                'D' => .left,
-                '3' => readDelete(reader),
-                else => .esc,
-            };
-        }
-
-        return .esc;
-    }
-
-    switch (byte) {
-        '\r' => return .enter,
-        127 => return .backspace,
-        else => {},
-    }
-
-    // control chars
-    if (std.ascii.isCntrl(byte)) return .{ .control = byte };
-
-    // may eventually need to check if the character is printable
-    return .{ .byte = byte };
-}
-
 const State = struct {
     cursor: usize,
     selected: usize,
@@ -232,7 +169,7 @@ fn draw(
 }
 
 const Action = union(enum) {
-    byte: u8,
+    str: []u8,
     line_up,
     line_down,
     cursor_left,
@@ -273,9 +210,12 @@ fn ctrlToAction(key: u8, vi_mode: bool) Action {
     };
 }
 
-fn keyToAction(key: Key, vi_mode: bool) Action {
-    return switch (key) {
-        .byte => |c| .{ .byte = c },
+fn inputToAction(input: term.InputBuffer, vi_mode: bool) Action {
+    return switch (input) {
+        .str => |bytes| {
+            if (bytes.len == 0) return .pass;
+            return .{ .str = bytes };
+        },
         .control => |c| ctrlToAction(c, vi_mode),
         .backspace => .backspace,
         .delete => .delete,
@@ -422,6 +362,7 @@ pub fn run(
     var tokens: [][]const u8 = splitQuery(tokens_buf, query.items);
     var smart_case: bool = !hasUpper(query.items);
 
+    var buf: [2048]u8 = undefined;
     var redraw = true;
     while (true) {
         // did the query change?
@@ -447,11 +388,14 @@ pub fn run(
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
 
-        const action = keyToAction(readKey(terminal), vi_mode);
+        const input = try terminal.read(&buf);
+        const action = inputToAction(input, vi_mode);
         switch (action) {
-            .byte => |b| {
-                try query.insert(state.cursor, b);
-                state.cursor += 1;
+            .str => |str| {
+                for (str) |byte| {
+                    try query.insert(state.cursor, byte);
+                    state.cursor += 1;
+                }
             },
             .delete_word => actionDeleteWord(&query, &state.cursor),
             .delete_line => {
