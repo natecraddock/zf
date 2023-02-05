@@ -304,6 +304,7 @@ test "escape ANSI codes" {
 pub fn run(
     allocator: Allocator,
     terminal: *Terminal,
+    normalizer: ziglyph.Normalizer,
     candidates: []Candidate,
     keep_order: bool,
     plain: bool,
@@ -338,8 +339,7 @@ pub fn run(
         if (query.dirty) {
             query.dirty = false;
 
-            // TODO: normalize query here
-            tokens = splitQuery(tokens_buf, query.slice());
+            tokens = splitQuery(tokens_buf, (try normalizer.nfd(allocator, query.slice())).slice);
             smart_case = !hasUpper(query.slice());
 
             filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, smart_case);

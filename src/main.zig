@@ -264,6 +264,7 @@ pub fn main() anyerror!void {
         var selected = ui.run(
             allocator,
             &terminal,
+            normalizer,
             candidates,
             config.keep_order,
             config.plain,
