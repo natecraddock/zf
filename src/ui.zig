@@ -5,15 +5,16 @@ const system = std.os.system;
 const testing = std.testing;
 const ziglyph = @import("ziglyph");
 
+const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Candidate = filter.Candidate;
+const EditBuffer = @import("EditBuffer.zig");
 const Range = filter.Range;
 const Terminal = term.Terminal;
 
 const term = @import("term.zig");
 
 const State = struct {
-    cursor: usize,
     selected: usize,
     prompt: []const u8,
     prompt_width: usize,
@@ -131,6 +132,7 @@ fn draw(
     terminal: *Terminal,
     state: *State,
     query: []const u8,
+    cursor: usize,
     tokens: [][]const u8,
     candidates: []Candidate,
     total_candidates: usize,
@@ -163,7 +165,7 @@ fn draw(
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
-    terminal.cursorRight(std.math.min(width - 1, state.cursor + state.prompt_width));
+    terminal.cursorRight(std.math.min(width - 1, cursor + state.prompt_width));
 
     try terminal.writer.flush();
 }
@@ -229,35 +231,6 @@ fn inputToAction(input: term.InputBuffer, vi_mode: bool) Action {
     };
 }
 
-fn charOrNull(char: u8) ?u8 {
-    // word separator chars for c-w word deletion
-    const word_chars = " -_/.";
-    const idx = std.mem.indexOfScalar(u8, word_chars, char);
-    if (idx) |i| {
-        return word_chars[i];
-    }
-    return null;
-}
-
-fn actionDeleteWord(query: *ArrayList(u8), cursor: *usize) void {
-    if (cursor.* > 0) {
-        const first_sep = charOrNull(query.items[cursor.* - 1]);
-        while (first_sep != null and cursor.* > 0 and first_sep.? == query.items[cursor.* - 1]) {
-            _ = query.pop();
-            cursor.* -= 1;
-        }
-        while (cursor.* > 0) {
-            _ = query.pop();
-            cursor.* -= 1;
-            if (cursor.* == 0) break;
-
-            const sep = charOrNull(query.items[cursor.* - 1]);
-            if (first_sep == null and sep != null) break;
-            if (first_sep != null and sep != null and first_sep.? == sep.?) break;
-        }
-    }
-}
-
 /// split the query on spaces and return a slice of query tokens
 pub fn splitQuery(query_tokens: [][]const u8, query: []const u8) [][]const u8 {
     var index: u8 = 0;
@@ -283,7 +256,7 @@ pub fn hasUpper(query: []const u8) bool {
 /// Is not intended to cover the entirety of ANSI. Only a reasonable subset. More escaped
 /// codes can be added as needed.
 /// Currently escapes SGR sequences (\x1b[ ... m)
-fn escapeANSI(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
+fn escapeANSI(allocator: Allocator, str: []const u8) ![]const u8 {
     const EscapeState = enum{
         esc,
         left_bracket,
@@ -327,7 +300,7 @@ test "escape ANSI codes" {
 }
 
 pub fn run(
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     terminal: *Terminal,
     candidates: []Candidate,
     keep_order: bool,
@@ -335,13 +308,12 @@ pub fn run(
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const u8 {
-    var query = ArrayList(u8).init(allocator);
+    var query = EditBuffer.init(allocator);
     defer query.deinit();
 
     const prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half);
 
     var state = State{
-        .cursor = 0,
         .selected = 0,
         .prompt = prompt_str,
         .prompt_width = prompt_width,
@@ -355,92 +327,58 @@ pub fn run(
 
     var filtered = candidates;
 
-    var old_state = state;
-    var old_query = try allocator.alloc(u8, query.items.len);
-
     var tokens_buf = try allocator.alloc([]const u8, 16);
-    var tokens: [][]const u8 = splitQuery(tokens_buf, query.items);
-    var smart_case: bool = !hasUpper(query.items);
+    var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());
+    var smart_case: bool = !hasUpper(query.slice());
 
     var buf: [2048]u8 = undefined;
     var redraw = true;
+
     while (true) {
         // did the query change?
-        if (!std.mem.eql(u8, query.items, old_query)) {
-            allocator.free(old_query);
-            old_query = try allocator.alloc(u8, query.items.len);
-            std.mem.copy(u8, old_query, query.items);
+        if (query.dirty) {
+            query.dirty = false;
 
-            tokens = splitQuery(tokens_buf, query.items);
-            smart_case = !hasUpper(query.items);
+            // TODO: normalize query here
+            tokens = splitQuery(tokens_buf, query.slice());
+            smart_case = !hasUpper(query.slice());
 
             filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, smart_case);
             redraw = true;
             state.selected = 0;
         }
 
-        // did the selection move?
-        if (redraw or state.cursor != old_state.cursor or state.selected != old_state.selected) {
-            old_state = state;
-            try draw(terminal, &state, query.items, tokens, filtered, candidates.len, smart_case, plain);
+        // do we need to redraw?
+        if (redraw) {
             redraw = false;
+            try draw(terminal, &state, query.slice(), query.cursor, tokens, filtered, candidates.len, smart_case, plain);
         }
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
 
         const input = try terminal.read(&buf);
         const action = inputToAction(input, vi_mode);
+
+        const last_cursor = query.cursor;
+        const last_selected = state.selected;
+
         switch (action) {
-            .str => |str| {
-                for (str) |byte| {
-                    try query.insert(state.cursor, byte);
-                    state.cursor += 1;
-                }
-            },
-            .delete_word => actionDeleteWord(&query, &state.cursor),
-            .delete_line => {
-                while (state.cursor > 0) {
-                    _ = query.orderedRemove(state.cursor - 1);
-                    state.cursor -= 1;
-                }
-            },
-            .delete_line_forward => {
-                while (query.items.len > state.cursor) {
-                    _ = query.pop();
-                }
-            },
-            .backspace => {
-                if (query.items.len > 0 and state.cursor == query.items.len) {
-                    _ = query.pop();
-                    state.cursor -= 1;
-                } else if (query.items.len > 0 and state.cursor > 0) {
-                    _ = query.orderedRemove(state.cursor);
-                    state.cursor -= 1;
-                }
-            },
-            .delete => {
-                if (query.items.len > 0 and state.cursor < query.items.len) {
-                    _ = query.orderedRemove(state.cursor);
-                }
-            },
+            .str => |str| try query.insert(str),
+            .delete_word => if (query.len > 0) deleteWord(&query),
+            .delete_line => query.deleteTo(0),
+            .delete_line_forward => query.deleteTo(query.len),
+            .backspace => query.delete(1, .left),
+            .delete => query.delete(1, .right),
             .line_up => if (state.selected > 0) {
                 state.selected -= 1;
             },
             .line_down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
             },
-            .cursor_left => if (state.cursor > 0) {
-                state.cursor -= 1;
-            },
-            .cursor_leftmost => if (state.cursor > 0) {
-                state.cursor = 0;
-            },
-            .cursor_rightmost => if (state.cursor < query.items.len) {
-                state.cursor = query.items.len;
-            },
-            .cursor_right => if (state.cursor < query.items.len) {
-                state.cursor += 1;
-            },
+            .cursor_left => query.moveCursor(1, .left),
+            .cursor_leftmost => query.setCursor(0),
+            .cursor_rightmost => query.setCursor(query.len),
+            .cursor_right => query.moveCursor(1, .right),
             .select => {
                 if (filtered.len == 0) break;
                 return filtered[state.selected].str;
@@ -448,7 +386,34 @@ pub fn run(
             .close => break,
             .pass => {},
         }
+
+        redraw = last_cursor != query.cursor or last_selected != state.selected;
     }
 
     return null;
+}
+
+/// Deletes a word to the left of the cursor. Words are separated by space or slash characters
+fn deleteWord(query: *EditBuffer) void {
+    var slice = query.slice()[0..query.cursorIndex()];
+    var end = slice.len - 1;
+
+    // ignore trailing spaces or slashes
+    const trailing = slice[end];
+    if (trailing == ' ' or trailing == '/') {
+        while (end > 1 and slice[end] == trailing) {
+            end -= 1;
+        }
+        slice = slice[0..end];
+    }
+
+    // find last most space or slash
+    var last_index: ?usize = null;
+    for (slice) |byte, i| {
+        if (byte == ' ' or byte == '/') last_index = i;
+    }
+
+    if (last_index) |index| {
+        query.deleteTo(query.bufferIndexToCursor(index + 1));
+    } else query.deleteTo(0);
 }

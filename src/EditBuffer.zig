@@ -1,5 +1,5 @@
-/// Manages an editable line of UTF-8 encoded text
-/// Assumes all input is valid UTF-8 because it is validated when read in term.zig
+//! Manages an editable line of UTF-8 encoded text
+//! Assumes all input is valid UTF-8 because it is validated when read in term.zig
 
 const std = @import("std");
 const testing = std.testing;
@@ -14,12 +14,14 @@ const EditBuffer = @This();
 buffer: ArrayList(u8),
 len: usize,
 cursor: usize,
+dirty: bool,
 
 pub fn init(allocator: Allocator) EditBuffer {
     return .{
         .buffer = ArrayList(u8).init(allocator),
         .len = 0,
         .cursor = 0,
+        .dirty = false,
     };
 }
 
@@ -39,6 +41,8 @@ pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
     const len = utf8Len(bytes);
     eb.cursor += len;
     eb.len += len;
+
+    eb.dirty = true;
 }
 
 const Direction = enum { left, right };
@@ -63,6 +67,8 @@ pub fn deleteTo(eb: *EditBuffer, pos: usize) void {
 
     eb.cursor = start;
     eb.len -= end - start;
+
+    eb.dirty = true;
 }
 
 /// Set the cursor to an absolute position
