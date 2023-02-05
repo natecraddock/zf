@@ -131,8 +131,7 @@ inline fn numDigits(number: usize) u16 {
 fn draw(
     terminal: *Terminal,
     state: *State,
-    query: []const u8,
-    cursor: usize,
+    query: *EditBuffer,
     tokens: [][]const u8,
     candidates: []Candidate,
     total_candidates: usize,
@@ -152,12 +151,14 @@ fn draw(
     terminal.cursorUp(terminal.height);
 
     // draw the prompt
+    // TODO: handle display of queries longer than the screen width
+    const query_width = try dw.strWidth(query.slice(), .half);
     terminal.clearLine();
-    terminal.print("{s}{s}", .{ state.prompt, query[0..std.math.min(width - state.prompt_width, query.len)] });
+    terminal.print("{s}{s}", .{ state.prompt, query.sliceRange(0, std.math.min(width - state.prompt_width, query_width)) });
 
     // draw info if there is room
     const separator_width = 1;
-    const spacing = @intCast(i32, width) - @intCast(i32, state.prompt_width + query.len + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
+    const spacing = @intCast(i32, width) - @intCast(i32, state.prompt_width + query_width + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
     if (spacing >= 1) {
         terminal.cursorRight(@intCast(usize, spacing));
         terminal.print("{}/{}", .{ candidates.len, total_candidates });
@@ -165,7 +166,8 @@ fn draw(
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
-    terminal.cursorRight(std.math.min(width - 1, cursor + state.prompt_width));
+    const cursor_width = try dw.strWidth(query.sliceRange(0, query.cursor), .half);
+    terminal.cursorRight(std.math.min(width - 1, cursor_width + state.prompt_width));
 
     try terminal.writer.flush();
 }
@@ -348,7 +350,7 @@ pub fn run(
         // do we need to redraw?
         if (redraw) {
             redraw = false;
-            try draw(terminal, &state, query.slice(), query.cursor, tokens, filtered, candidates.len, smart_case, plain);
+            try draw(terminal, &state, &query, tokens, filtered, candidates.len, smart_case, plain);
         }
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
