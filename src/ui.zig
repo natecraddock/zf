@@ -167,7 +167,7 @@ fn draw(
     // TODO: handle display of queries longer than the screen width
     const query_width = try dw.strWidth(query.slice(), .half);
     terminal.clearLine();
-    terminal.print("{s}{s}", .{ state.prompt, query.sliceRange(0, std.math.min(width - state.prompt_width, query_width)) });
+    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(query.slice(), std.math.min(width - state.prompt_width, query_width)) });
 
     // draw info if there is room
     const separator_width = 1;
