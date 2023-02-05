@@ -311,12 +311,10 @@ pub fn run(
     var query = EditBuffer.init(allocator);
     defer query.deinit();
 
-    const prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half);
-
     var state = State{
         .selected = 0,
         .prompt = prompt_str,
-        .prompt_width = prompt_width,
+        .prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half),
     };
 
     // ensure enough room to draw all lines of output by drawing blank lines,
@@ -331,7 +329,6 @@ pub fn run(
     var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());
     var smart_case: bool = !hasUpper(query.slice());
 
-    var buf: [2048]u8 = undefined;
     var redraw = true;
 
     while (true) {
@@ -356,6 +353,7 @@ pub fn run(
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
 
+        var buf: [2048]u8 = undefined;
         const input = try terminal.read(&buf);
         const action = inputToAction(input, vi_mode);
 
