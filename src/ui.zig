@@ -89,6 +89,18 @@ fn computeRanges(
     return ranges[0..tokens.len];
 }
 
+// Slices a string to be no longer than the specified width while considering graphemes and display width
+fn graphemeWidthSlice(str: []const u8, width: usize) []const u8 {
+    var iter = ziglyph.GraphemeIterator.init(str) catch unreachable;
+    var current_width: usize = 0;
+    while (iter.next()) |grapheme| {
+        const grapheme_width = dw.strWidth(grapheme.bytes, .half) catch unreachable;
+        if (current_width + grapheme_width > width) return str[0..grapheme.offset];
+        current_width += grapheme_width;
+    }
+    return str;
+}
+
 inline fn drawCandidate(
     terminal: *Terminal,
     candidate: Candidate,
@@ -105,7 +117,8 @@ inline fn drawCandidate(
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
     const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, smart_case);
 
-    const str = candidate.str[0..std.math.min(width, candidate.str.len)];
+    const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
+    const str = graphemeWidthSlice(candidate.str, @min(width, str_width));
 
     // no highlights, just draw the string
     if (ranges.len == 0 or terminal.no_color) {
