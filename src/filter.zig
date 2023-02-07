@@ -3,8 +3,6 @@ const ArrayList = std.ArrayList;
 const testing = std.testing;
 
 /// Candidates are the strings read from stdin
-/// if the filepath matching algorithm is used, then name will be
-/// used to store the filename of the path in str.
 pub const Candidate = struct {
     str: []const u8,
     rank: f64 = 0,
