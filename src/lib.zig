@@ -91,4 +91,8 @@ test "highlight library interface" {
     try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("abcdef", null, "a", false));
     try testing.expectEqual(Range{ .start = 5, .end = 5 }, highlightToken("abcdeF", null, "F", true));
     try testing.expectEqual(Range{ .start = 10, .end = 13 }, highlightToken("a/path/to/file", "file", "file", false));
+
+    // highlights with basename trailing slashes
+    try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("s/", "s", "s", false));
+    try testing.expectEqual(Range{ .start = 20, .end = 23 }, highlightToken("/this/is/path/not/a/file/", "file", "file", false));
 }

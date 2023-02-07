@@ -260,7 +260,9 @@ pub fn highlightToken(
 
     // highlight on the filename if requested
     if (filenameOrNull) |filename| {
-        const offs = str.len - filename.len;
+        // The basename doesn't include trailing slashes so if the string ends in a slash the offset
+        // will be off by one
+        const offs = str.len - filename.len - @as(usize, if (str[str.len - 1] == '/') 1 else 0);
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
             if (scanToEnd(filename, token[1..], start_index, case_sensitive)) |match| {
