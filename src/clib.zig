@@ -17,7 +17,7 @@ export fn rank(
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        if (filter.rankToken(string, name, token, !case_sensitive)) |r| {
+        if (filter.rankToken(string, name, token, case_sensitive)) |r| {
             total_rank += r;
         } else return -1.0;
     }
@@ -34,7 +34,7 @@ export fn rankToken(
     const string = std.mem.span(str);
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
-    if (filter.rankToken(string, name, tok, !case_sensitive)) |r| {
+    if (filter.rankToken(string, name, tok, case_sensitive)) |r| {
         return r;
     } else return -1.0;
 }
@@ -89,7 +89,7 @@ export fn highlight(
     var index: usize = 0;
     while (index < num) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        ranges[index] = filter.highlightToken(string, name, token, !case_sensitive);
+        ranges[index] = filter.highlightToken(string, name, token, case_sensitive);
     }
 }
 
@@ -102,7 +102,7 @@ export fn highlightToken(
     const string = std.mem.span(str);
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
-    return filter.highlightToken(string, name, tok, !case_sensitive);
+    return filter.highlightToken(string, name, tok, case_sensitive);
 }
 
 fn testHighlight(

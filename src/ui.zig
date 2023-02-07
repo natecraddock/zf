@@ -81,10 +81,10 @@ fn computeRanges(
     filenameOrNull: ?[]const u8,
     ranges: []Range,
     tokens: [][]const u8,
-    smart_case: bool,
+    case_sensitive: bool,
 ) []Range {
     for (tokens) |token, i| {
-        ranges[i] = filter.highlightToken(str, filenameOrNull, token, smart_case);
+        ranges[i] = filter.highlightToken(str, filenameOrNull, token, case_sensitive);
     }
     return ranges[0..tokens.len];
 }
@@ -107,7 +107,7 @@ inline fn drawCandidate(
     tokens: [][]const u8,
     width: usize,
     selected: bool,
-    smart_case: bool,
+    case_sensitive: bool,
     plain: bool,
 ) void {
     if (selected) terminal.sgr(.reverse);
@@ -115,7 +115,7 @@ inline fn drawCandidate(
 
     var ranges_buf: [16]Range = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
-    const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, smart_case);
+    const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, case_sensitive);
 
     const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
     const str = graphemeWidthSlice(candidate.str, @min(width, str_width));
@@ -148,7 +148,7 @@ fn draw(
     tokens: [][]const u8,
     candidates: []Candidate,
     total_candidates: usize,
-    smart_case: bool,
+    case_sensitive: bool,
     plain: bool,
 ) !void {
     const width = terminal.windowSize().?.x;
@@ -158,7 +158,7 @@ fn draw(
     while (line < terminal.height) : (line += 1) {
         terminal.cursorDown(1);
         terminal.clearLine();
-        if (line < candidates.len) drawCandidate(terminal, candidates[line], tokens, width, line == state.selected, smart_case, plain);
+        if (line < candidates.len) drawCandidate(terminal, candidates[line], tokens, width, line == state.selected, case_sensitive, plain);
     }
     terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
@@ -343,7 +343,7 @@ pub fn run(
 
     var tokens_buf = try allocator.alloc([]const u8, 16);
     var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());
-    var smart_case: bool = !hasUpper(query.slice());
+    var case_sensitive: bool = hasUpper(query.slice());
 
     var redraw = true;
 
@@ -353,9 +353,9 @@ pub fn run(
             query.dirty = false;
 
             tokens = splitQuery(tokens_buf, (try normalizer.nfd(allocator, query.slice())).slice);
-            smart_case = !hasUpper(query.slice());
+            case_sensitive = hasUpper(query.slice());
 
-            filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, smart_case);
+            filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, case_sensitive);
             redraw = true;
             state.selected = 0;
         }
@@ -363,7 +363,7 @@ pub fn run(
         // do we need to redraw?
         if (redraw) {
             redraw = false;
-            try draw(terminal, &state, &query, tokens, filtered, candidates.len, smart_case, plain);
+            try draw(terminal, &state, &query, tokens, filtered, candidates.len, case_sensitive, plain);
         }
 
         const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));

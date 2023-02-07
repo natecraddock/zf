@@ -236,8 +236,8 @@ pub fn main() anyerror!void {
         // faster, likely due to locality with other heap-alloced data used in the algorithm.
         var tokens_buf = try allocator.alloc([]const u8, 16);
         const tokens = ui.splitQuery(tokens_buf, config.query);
-        const smart_case = !ui.hasUpper(config.query);
-        const filtered = try filter.rankCandidates(allocator, candidates, tokens, config.keep_order, config.plain, smart_case);
+        const case_sensitive = ui.hasUpper(config.query);
+        const filtered = try filter.rankCandidates(allocator, candidates, tokens, config.keep_order, config.plain, case_sensitive);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});

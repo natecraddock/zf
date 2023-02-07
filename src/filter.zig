@@ -83,7 +83,7 @@ pub fn rankCandidates(
     tokens: [][]const u8,
     keep_order: bool,
     plain: bool,
-    smart_case: bool,
+    case_sensitive: bool,
 ) ![]Candidate {
     var ranked = ArrayList(Candidate).init(allocator);
 
@@ -97,7 +97,7 @@ pub fn rankCandidates(
     for (candidates) |candidate| {
         // TODO: is this copy needed?
         var c = candidate;
-        if (rankCandidate(&c, tokens, smart_case, plain)) {
+        if (rankCandidate(&c, tokens, case_sensitive, plain)) {
             try ranked.append(c);
         }
     }
@@ -123,14 +123,14 @@ const IndexIterator = struct {
     str: []const u8,
     char: u8,
     index: usize = 0,
-    smart_case: bool,
+    case_sensitive: bool,
 
-    pub fn init(str: []const u8, char: u8, smart_case: bool) @This() {
-        return .{ .str = str, .char = char, .smart_case = smart_case };
+    pub fn init(str: []const u8, char: u8, case_sensitive: bool) @This() {
+        return .{ .str = str, .char = char, .case_sensitive = case_sensitive };
     }
 
     pub fn next(self: *@This()) ?usize {
-        const index = if (self.smart_case) indexOf(u8, self.str, self.index, self.char) else indexOfCaseSensitive(u8, self.str, self.index, self.char);
+        const index = if (self.case_sensitive) indexOfCaseSensitive(u8, self.str, self.index, self.char) else indexOf(u8, self.str, self.index, self.char);
         if (index) |i| self.index = i + 1;
         return index;
     }
@@ -142,7 +142,7 @@ const IndexIterator = struct {
 fn rankCandidate(
     candidate: *Candidate,
     query_tokens: [][]const u8,
-    smart_case: bool,
+    case_sensitive: bool,
     plain: bool,
 ) bool {
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
@@ -151,7 +151,7 @@ fn rankCandidate(
     // each tokens rank is summed. if any token does not match the candidate is ignored
     candidate.rank = 0;
     for (query_tokens) |token| {
-        if (rankToken(candidate.str, filename, token, smart_case)) |r| {
+        if (rankToken(candidate.str, filename, token, case_sensitive)) |r| {
             candidate.rank += r;
         } else return false;
     }
@@ -164,7 +164,7 @@ pub fn rankToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
     token: []const u8,
-    smart_case: bool,
+    case_sensitive: bool,
 ) ?f64 {
     if (str.len == 0 or token.len == 0) return null;
 
@@ -174,9 +174,9 @@ pub fn rankToken(
 
     // perform search on the filename only if requested
     if (filenameOrNull) |filename| {
-        var it = IndexIterator.init(filename, token[0], smart_case);
+        var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, smart_case)) |match| {
+            if (scanToEnd(filename, token[1..], start_index, case_sensitive)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                 }
@@ -200,9 +200,9 @@ pub fn rankToken(
     }
 
     // perform search on the full string if requested or if no match was found on the filename
-    var it = IndexIterator.init(str, token[0], smart_case);
+    var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
+        if (scanToEnd(str, token[1..], start_index, case_sensitive)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
             }
@@ -255,7 +255,7 @@ pub fn highlightToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
     token: []const u8,
-    smart_case: bool,
+    case_sensitive: bool,
 ) Range {
     var best_rank: ?f64 = null;
     var range: Range = .{};
@@ -263,9 +263,9 @@ pub fn highlightToken(
     // highlight on the filename if requested
     if (filenameOrNull) |filename| {
         const offs = str.len - filename.len;
-        var it = IndexIterator.init(filename, token[0], smart_case);
+        var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, smart_case)) |match| {
+            if (scanToEnd(filename, token[1..], start_index, case_sensitive)) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                     range = .{ .start = match.start + offs, .end = match.end + offs };
@@ -276,9 +276,9 @@ pub fn highlightToken(
     }
 
     // highlight the full string if requested or if no match was found on the filename
-    var it = IndexIterator.init(str, token[0], smart_case);
+    var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, smart_case)) |match| {
+        if (scanToEnd(str, token[1..], start_index, case_sensitive)) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
                 range = .{ .start = match.start, .end = match.end };
@@ -304,7 +304,7 @@ inline fn isStartOfWord(byte: u8) bool {
 
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
-fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case: bool) ?Match {
+fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, case_sensitive: bool) ?Match {
     var match: Match = .{ .rank = 1, .start = start_index, .end = 0 };
     var last_index = start_index;
     var last_sequential = false;
@@ -315,7 +315,7 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, smart_case:
     }
 
     for (token) |c| {
-        const index = if (smart_case) indexOf(u8, str, last_index + 1, c) else indexOfCaseSensitive(u8, str, last_index + 1, c);
+        const index = if (case_sensitive) indexOfCaseSensitive(u8, str, last_index + 1, c) else indexOf(u8, str, last_index + 1, c);
         if (index == null) return null;
 
         if (index.? == last_index + 1) {

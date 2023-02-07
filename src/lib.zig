@@ -11,7 +11,7 @@ pub fn rank(
 ) f64 {
     var total_rank: f64 = 0;
     for (tokens) |token| {
-        if (filter.rankToken(str, filename, token, !case_sensitive)) |r| {
+        if (filter.rankToken(str, filename, token, case_sensitive)) |r| {
             total_rank += r;
         } else return -1.0;
     }
@@ -25,7 +25,7 @@ pub fn rankToken(
     token: []const u8,
     case_sensitive: bool,
 ) ?f64 {
-    return filter.rankToken(str, filename, token, !case_sensitive);
+    return filter.rankToken(str, filename, token, case_sensitive);
 }
 
 test "rank library interface" {
@@ -56,7 +56,7 @@ pub fn highlight(
     case_sensitive: bool,
 ) void {
     for (tokens) |token, i| {
-        ranges[i] = filter.highlightToken(str, filename, token, !case_sensitive);
+        ranges[i] = filter.highlightToken(str, filename, token, case_sensitive);
     }
 }
 
@@ -67,7 +67,7 @@ pub fn highlightToken(
     token: []const u8,
     case_sensitive: bool,
 ) Range {
-    return filter.highlightToken(str, filename, token, !case_sensitive);
+    return filter.highlightToken(str, filename, token, case_sensitive);
 }
 
 fn testHighlight(
