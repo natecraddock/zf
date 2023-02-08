@@ -272,7 +272,7 @@ pub fn hasUpper(query: []const u8) bool {
 /// codes can be added as needed.
 /// Currently escapes SGR sequences (\x1b[ ... m)
 fn escapeANSI(allocator: Allocator, str: []const u8) ![]const u8 {
-    const EscapeState = enum{
+    const EscapeState = enum {
         esc,
         left_bracket,
         sgr,
