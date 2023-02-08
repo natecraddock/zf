@@ -9,13 +9,12 @@ zf is a commandline fuzzy finder that prioritizes matches on filenames.
 
 ## Features
 
-* zf ranks matches on filenames higher than matches on the complete path
-* each whitespace-delimited query term is used separately to refine search
-  results
+* matches on filenames are ranked higher than matches on the complete path
+* refine search results with whitespace separated query terms
 * simple TUI interface that highlights matched ranges in results
-* smartcase: when the query contains no uppercase letters case-insensitive
-  matching is used
-* the ranking algorithm is packaged as both Zig and C libraries for integration with other projects
+* smartcase: case insensitive unless the query contains uppercase letters
+* Zig and C libraries for the zf ranking algorithm
+* also functions as a general purpose fuzzy finder
 
 ## Docs
 
@@ -47,9 +46,7 @@ zf targets the latest stable release of Zig. Compile with `zig build
 
 ## Use
 
-zf accepts lines on stdin and outputs the selection on stdout. Use with a pipe,
-or io redirection. See the
-[documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details.
+zf accepts newline separated strings on `stdin` and outputs the selected line on `stdout`. Use with a pipe, or io redirection. See the [documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details.
 
 ## Why zf over fzf, fzy, selecta, pick, etc?
 
@@ -96,13 +93,6 @@ zf will remain simple:
 * minimal config and options
 * sensible defaults
 
-## Does the name 'zf' mean anything?
-
-zf could be interpreted as a shortened [fzf](https://github.com/junegunn/fzf) or
-[fzy](https://github.com/jhawthorn/fzy). zf may also be interpreted as "Zig
-find" or "Zig fuzzy finder". I like to think of it as a more efficient way to
-type `fzf`, emphasizing the speed and precision of the finding algorithm.
-
 ## Integrations
 
 Would you like to use zf in an editor? Try one of the following plugins
@@ -112,18 +102,3 @@ Would you like to use zf in an editor? Try one of the following plugins
 * [telescope-zf-native.nvim](https://github.com/natecraddock/telescope-zf-native.nvim)
   a neovim [telescope](https://github.com/nvim-telescope/telescope.nvim)
   extension to override the default Lua sorter with zf.
-
-## Status
-
-zf now works for fast and accurate file matching. I would like to improve the
-tests to prevent regressions and catch corner cases, but it should be usable for
-day-to-day fuzzy finding!
-
-### Roadmap
-
-I previously had specific goals for future versions listed here. Rather than constrain myself, I will only list some possible future improvements
-
-* utf-8 unicode support
-* vectorization optimizations
-* small ranking improvements
-* better cli argument parsing
