@@ -78,7 +78,7 @@ test "collectCandidates excess whitespace" {
 pub fn rankCandidates(
     allocator: std.mem.Allocator,
     candidates: []Candidate,
-    tokens: [][]const u8,
+    tokens: []const []const u8,
     keep_order: bool,
     plain: bool,
     case_sensitive: bool,
@@ -139,7 +139,7 @@ const IndexIterator = struct {
 /// algorithm inspired by https://github.com/garybernhardt/selecta
 fn rankCandidate(
     candidate: *Candidate,
-    query_tokens: [][]const u8,
+    query_tokens: []const []const u8,
     case_sensitive: bool,
     plain: bool,
 ) bool {
@@ -357,4 +357,68 @@ fn sort(_: void, a: Candidate, b: Candidate) bool {
         if (c > b.str[i]) return false;
     }
     return false;
+}
+
+// These tests are arguably the most important in zf. They ensure the ordering of filtered
+// items is maintained when updating the filter algorithms. The test cases are based on
+// experience with other fuzzy finders that led to the creation of zf. When I find new
+// ways to improve the filtering algorithm these tests should all pass, and new tests
+// should be added to ensure the filtering doesn't break. The tests don't check the actual
+// rank value, only the order of the first n results.
+
+fn testRankCandidates(
+    tokens: []const []const u8,
+    candidate_strings: []const []const u8,
+    expected: []const []const u8,
+) !void {
+    var candidates = try ArrayList(Candidate).initCapacity(testing.allocator, candidate_strings.len);
+    defer candidates.deinit();
+
+    for (candidate_strings) |str| {
+        candidates.appendAssumeCapacity(.{ .str = str });
+    }
+
+    const ranked = try rankCandidates(testing.allocator, candidates.items, tokens, false, false, false);
+    defer testing.allocator.free(ranked);
+
+    for (expected) |expected_str, i| {
+        if (!std.mem.eql(u8, expected_str, ranked[i].str)) {
+            std.debug.print("\n======= order incorrect: ========\n", .{});
+            for (ranked[0..expected.len]) |candidate| std.debug.print("{s}\n", .{candidate.str});
+            std.debug.print("\n========== expected: ===========\n", .{});
+            for (expected) |str| std.debug.print("{s}\n", .{str});
+            std.debug.print("\n================================", .{});
+            std.debug.print("\nwith query:", .{});
+            for (tokens) |token| std.debug.print(" {s}", .{token});
+            std.debug.print("\n\n", .{});
+
+            return error.TestOrderIncorrect;
+        }
+    }
+}
+
+test "zf ranking consistency" {
+    // Filepaths from Blender. Both fzf and fzy rank DNA_genfile.h first
+    try testRankCandidates(
+        &.{"make"},
+        &.{
+            "source/blender/makesrna/intern/rna_cachefile.c",
+            "source/blender/makesdna/intern/dna_genfile.c",
+            "source/blender/makesdna/DNA_curveprofile_types.h",
+            "source/blender/makesdna/DNA_genfile.h",
+            "GNUmakefile",
+        },
+        &.{"GNUmakefile"},
+    );
+
+    // From issue #3, prioritize filename coverage
+    try testRankCandidates(&.{"a"}, &.{ "/path/a.c", "abcd" }, &.{"/path/a.c"});
+    try testRankCandidates(
+        &.{"app.py"},
+        &.{
+            "./myownmod/custom/app.py",
+            "./tests/test_app.py",
+        },
+        &.{"./tests/test_app.py"},
+    );
 }
