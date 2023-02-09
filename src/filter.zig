@@ -105,12 +105,23 @@ pub fn rankCandidates(
     return ranked[0..index];
 }
 
-const indexOfCaseSensitive = std.mem.indexOfScalarPos;
-
-fn indexOf(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
+fn indexOf(
+    comptime T: type,
+    slice: []const T,
+    start_index: usize,
+    value: T,
+    strict_path_match: bool,
+    comptime case_sensitive: bool,
+) ?usize {
     var i: usize = start_index;
     while (i < slice.len) : (i += 1) {
-        if (std.ascii.toLower(slice[i]) == value) return i;
+        if (strict_path_match and value != '/' and slice[i] == '/') return null;
+
+        if (case_sensitive) {
+            if (slice[i] == value) return i;
+        } else {
+            if (std.ascii.toLower(slice[i]) == value) return i;
+        }
     }
     return null;
 }
@@ -126,7 +137,11 @@ const IndexIterator = struct {
     }
 
     pub fn next(self: *@This()) ?usize {
-        const index = if (self.case_sensitive) indexOfCaseSensitive(u8, self.str, self.index, self.char) else indexOf(u8, self.str, self.index, self.char);
+        const index = if (self.case_sensitive)
+            indexOf(u8, self.str, self.index, self.char, false, true)
+        else
+            indexOf(u8, self.str, self.index, self.char, false, false);
+
         if (index) |i| self.index = i + 1;
         return index;
     }
@@ -172,11 +187,11 @@ pub fn rankToken(
     if (filenameOrNull) |filename| {
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, case_sensitive)) |match| {
+            if (scanToEnd(filename, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                 }
-            } else break;
+            } else if (token[0] != '/') break;
         }
 
         if (best_rank != null) {
@@ -198,11 +213,11 @@ pub fn rankToken(
     // perform search on the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, case_sensitive)) |match| {
+        if (scanToEnd(str, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
             }
-        } else break;
+        } else if (token[0] != '/') break;
     }
 
     return best_rank;
@@ -263,12 +278,12 @@ pub fn highlightToken(
         const offs = str.len - filename.len - @as(usize, if (str[str.len - 1] == '/') 1 else 0);
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, case_sensitive)) |match| {
+            if (scanToEnd(filename, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
                 if (best_rank == null or match.rank < best_rank.?) {
                     best_rank = match.rank;
                     range = .{ .start = match.start + offs, .end = match.end + offs };
                 }
-            } else break;
+            } else if (token[0] != '/') break;
         }
         if (best_rank != null) return range;
     }
@@ -276,12 +291,12 @@ pub fn highlightToken(
     // highlight the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, case_sensitive)) |match| {
+        if (scanToEnd(str, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
             if (best_rank == null or match.rank < best_rank.?) {
                 best_rank = match.rank;
                 range = .{ .start = match.start, .end = match.end };
             }
-        } else break;
+        } else if (token[0] != '/') break;
     }
 
     return range;
@@ -302,10 +317,17 @@ inline fn isStartOfWord(byte: u8) bool {
 
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
-fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, case_sensitive: bool) ?Match {
+fn scanToEnd(
+    str: []const u8,
+    token: []const u8,
+    start_index: usize,
+    case_sensitive: bool,
+    start_strict_path_match: bool,
+) ?Match {
     var match: Match = .{ .rank = 1, .start = start_index, .end = 0 };
     var last_index = start_index;
     var last_sequential = false;
+    var strict_path_match = start_strict_path_match;
 
     // penalty for not starting on a word boundary
     if (start_index > 0 and !isStartOfWord(str[start_index - 1])) {
@@ -313,7 +335,11 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, case_sensit
     }
 
     for (token) |c| {
-        const index = if (case_sensitive) indexOfCaseSensitive(u8, str, last_index + 1, c) else indexOf(u8, str, last_index + 1, c);
+        const index = if (case_sensitive)
+            indexOf(u8, str, last_index + 1, c, strict_path_match, true)
+        else
+            indexOf(u8, str, last_index + 1, c, strict_path_match, false);
+
         if (index == null) return null;
 
         if (index.? == last_index + 1) {
@@ -334,6 +360,7 @@ fn scanToEnd(str: []const u8, token: []const u8, start_index: usize, case_sensit
         }
 
         last_index = index.?;
+        if (c == '/') strict_path_match = true;
     }
 
     match.end = last_index;
