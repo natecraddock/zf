@@ -318,7 +318,7 @@ pub fn run(
     allocator: Allocator,
     terminal: *Terminal,
     normalizer: ziglyph.Normalizer,
-    candidates: []Candidate,
+    candidates: [][]const u8,
     keep_order: bool,
     plain: bool,
     prompt_str: []const u8,
@@ -339,7 +339,13 @@ pub fn run(
     terminal.scrollDown(terminal.height);
     terminal.cursorUp(terminal.height);
 
-    var filtered = candidates;
+    var filtered = blk: {
+        var filtered = try ArrayList(Candidate).initCapacity(allocator, candidates.len);
+        for (candidates) |candidate| {
+            filtered.appendAssumeCapacity(.{ .str = candidate });
+        }
+        break :blk filtered.toOwnedSlice();
+    };
 
     var tokens_buf = try allocator.alloc([]const u8, 16);
     var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());

@@ -15,8 +15,8 @@ pub const Range = packed struct {
 };
 
 /// read the candidates from the buffer
-pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]Candidate {
-    var candidates = ArrayList(Candidate).init(allocator);
+pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![][]const u8 {
+    var candidates = ArrayList([]const u8).init(allocator);
 
     // find delimiters
     var start: usize = 0;
@@ -24,7 +24,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
         if (char == delimiter) {
             // add to arraylist only if slice is not all delimiters
             if (index - start != 0) {
-                try candidates.append(.{ .str = buf[start..index] });
+                try candidates.append(buf[start..index]);
             }
             start = index + 1;
         }
@@ -32,7 +32,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 
     // catch the end if stdio didn't end in a delimiter
     if (start < buf.len) {
-        try candidates.append(.{ .str = buf[start..] });
+        try candidates.append(buf[start..]);
     }
 
     return candidates.toOwnedSlice();
@@ -43,10 +43,10 @@ test "collectCandidates whitespace" {
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
-    try testing.expectEqualStrings("first", candidates[0].str);
-    try testing.expectEqualStrings("second", candidates[1].str);
-    try testing.expectEqualStrings("third", candidates[2].str);
-    try testing.expectEqualStrings("fourth", candidates[3].str);
+    try testing.expectEqualStrings("first", candidates[0]);
+    try testing.expectEqualStrings("second", candidates[1]);
+    try testing.expectEqualStrings("third", candidates[2]);
+    try testing.expectEqualStrings("fourth", candidates[3]);
 }
 
 test "collectCandidates newline" {
@@ -54,10 +54,10 @@ test "collectCandidates newline" {
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
-    try testing.expectEqualStrings("first", candidates[0].str);
-    try testing.expectEqualStrings("second", candidates[1].str);
-    try testing.expectEqualStrings("third", candidates[2].str);
-    try testing.expectEqualStrings("fourth", candidates[3].str);
+    try testing.expectEqualStrings("first", candidates[0]);
+    try testing.expectEqualStrings("second", candidates[1]);
+    try testing.expectEqualStrings("third", candidates[2]);
+    try testing.expectEqualStrings("fourth", candidates[3]);
 }
 
 test "collectCandidates excess whitespace" {
@@ -65,10 +65,10 @@ test "collectCandidates excess whitespace" {
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
-    try testing.expectEqualStrings("first", candidates[0].str);
-    try testing.expectEqualStrings("second", candidates[1].str);
-    try testing.expectEqualStrings("third", candidates[2].str);
-    try testing.expectEqualStrings("fourth", candidates[3].str);
+    try testing.expectEqualStrings("first", candidates[0]);
+    try testing.expectEqualStrings("second", candidates[1]);
+    try testing.expectEqualStrings("third", candidates[2]);
+    try testing.expectEqualStrings("fourth", candidates[3]);
 }
 
 /// rank each candidate against the query
@@ -77,7 +77,7 @@ test "collectCandidates excess whitespace" {
 /// in a tui or output to stdout
 pub fn rankCandidates(
     allocator: std.mem.Allocator,
-    candidates: []Candidate,
+    candidates: []const []const u8,
     tokens: []const []const u8,
     keep_order: bool,
     plain: bool,
@@ -87,16 +87,14 @@ pub fn rankCandidates(
 
     if (tokens.len == 0) {
         for (candidates) |candidate| {
-            try ranked.append(candidate);
+            try ranked.append(.{ .str = candidate });
         }
         return ranked.toOwnedSlice();
     }
 
     for (candidates) |candidate| {
-        // TODO: is this copy needed?
-        var c = candidate;
-        if (rankCandidate(&c, tokens, case_sensitive, plain)) {
-            try ranked.append(c);
+        if (rankCandidate(candidate, tokens, case_sensitive, plain)) |rank| {
+            try ranked.append(.{ .str = candidate, .rank = rank });
         }
     }
 
@@ -138,24 +136,24 @@ const IndexIterator = struct {
 ///
 /// algorithm inspired by https://github.com/garybernhardt/selecta
 fn rankCandidate(
-    candidate: *Candidate,
+    candidate: []const u8,
     query_tokens: []const []const u8,
     case_sensitive: bool,
     plain: bool,
-) bool {
-    const filename = if (plain) null else std.fs.path.basename(candidate.str);
+) ?f64 {
+    const filename = if (plain) null else std.fs.path.basename(candidate);
 
     // the candidate must contain all of the characters (in order) in each token.
     // each tokens rank is summed. if any token does not match the candidate is ignored
-    candidate.rank = 0;
+    var rank: f64 = 0;
     for (query_tokens) |token| {
-        if (rankToken(candidate.str, filename, token, case_sensitive)) |r| {
-            candidate.rank += r;
-        } else return false;
+        if (rankToken(candidate, filename, token, case_sensitive)) |r| {
+            rank += r;
+        } else return null;
     }
 
     // all tokens matched and the best ranks for each tokens are summed
-    return true;
+    return rank;
 }
 
 pub fn rankToken(
@@ -368,17 +366,10 @@ fn sort(_: void, a: Candidate, b: Candidate) bool {
 
 fn testRankCandidates(
     tokens: []const []const u8,
-    candidate_strings: []const []const u8,
+    candidates: []const []const u8,
     expected: []const []const u8,
 ) !void {
-    var candidates = try ArrayList(Candidate).initCapacity(testing.allocator, candidate_strings.len);
-    defer candidates.deinit();
-
-    for (candidate_strings) |str| {
-        candidates.appendAssumeCapacity(.{ .str = str });
-    }
-
-    const ranked = try rankCandidates(testing.allocator, candidates.items, tokens, false, false, false);
+    const ranked = try rankCandidates(testing.allocator, candidates, tokens, false, false, false);
     defer testing.allocator.free(ranked);
 
     for (expected) |expected_str, i| {
