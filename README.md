@@ -54,7 +54,7 @@ Fzf and fzy both rank `source/blender/makesdna/DNA_genfile.h` first in the resul
 
 ### Space-separated tokens
 
-Each space separated query term is used to narrow down the results. Imagine searching for an `__init__.py` file in a Python project.
+But not every filename is unique. Sometimes there are codebases where there are many files with the same or similar names, like an `__init__.py` in Python, or `.c` and `.h` file pairs in C. In zf each space separated query term is used to narrow down the results. Imagine searching for an `__init__.py` file in a Python project.
 
 ```text
 > init
