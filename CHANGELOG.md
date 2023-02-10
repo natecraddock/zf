@@ -1,14 +1,38 @@
 # master
 
-* **feat**: add ZF_HIGHLIGHT environment variable to set highlight color
+This release includes many fixes, refactors, optimizations, and unicode support.
+
+* **feat**: unicode support
+  ([3e7069](https://github.com/natecraddock/zf/commit/3e7069))
+  ([d596cc](https://github.com/natecraddock/zf/commit/d596cc))
+  ([b397fa](https://github.com/natecraddock/zf/commit/b397fa))
+
+  Zf now normalizes all input (both the lines read on `stdin` and the query text) to unicode NFD form. This improves matching accuracy. The query editing line also now fully supports unicode grapheme cluster editing.
+
+* **feat**: add `ZF_HIGHLIGHT` environment variable to set highlight color
   ([3cf713](https://github.com/natecraddock/zf/commit/3cf713))
 
   Adds a new environment variable to set the highlight color. Valid colors are: black, red, green, yellow, blue, magenta, cyan, white, bright_black, bright_red, bright_green, bright_yellow, bright_blue, bright_magenta, bright_cyan, and bright_white
 
-* **fix**: escape ANSI codes in ZF_PROMPT
+* **perf**: preallocate filtered candidate buffers
+  ([c2a36ba](https://github.com/natecraddock/zf/commit/c2a36ba))
+
+  Because zf uses an arena allocator and does not deallocate, this prevents unnecessary allocations. Zf no longer has memory use increase over the runtime of the program. This also slightly improves performance by reducing time spent allocating.
+
+* **tests**: add initial zf ranking consistency tests
+  ([fbfb8f](https://github.com/natecraddock/zf/commit/fbfb8f))
+
+
+* **fix**: escape ANSI codes in `ZF_PROMPT`
   ([7d32ad](https://github.com/natecraddock/zf/commit/7d32ad))
 
-  This adds SGR ANSI escape code handling to ZF_PROMPT. It now correctly calculates the width of the prompt when ANSI codes are included. Currently only supports the SGR codes
+  This adds SGR ANSI escape code handling to `ZF_PROMPT`. It now correctly calculates the width of the prompt when ANSI codes are included. Currently only supports the SGR codes
+
+* **fix**: correctly calculate the width of unicode in `ZF_PROMPT`
+  ([c426ac](https://github.com/natecraddock/zf/commit/c426ac))
+
+* **fix**: highlights incorrect when a candidate ends in a `/` character
+  ([1d8924](https://github.com/natecraddock/zf/commit/1d8924))
 
 # 0.6.0
 
