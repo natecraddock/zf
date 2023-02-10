@@ -145,6 +145,9 @@ test "EditBuffer uft8Len" {
     try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("🇺🇸"));
     // Polar bear consists of 4 individual multi-byte codepoints
     try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("🐻‍❄️"));
+
+    // Tests for lengths of emoji both normal and ZWJ
+    try testing.expectEqual(@as(usize, 2), EditBuffer.utf8Len("🇺🇸🇺🇸"));
     try testing.expectEqual(@as(usize, 2), EditBuffer.utf8Len("🐻‍❄️🐻‍❄️"));
 }
 

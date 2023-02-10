@@ -162,24 +162,22 @@ fn draw(
     }
     terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
+    terminal.clearLine();
+
+    // draw the stats
+    const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
+    terminal.cursorRight(width - stats_width);
+    terminal.print("{}/{}", .{ candidates.len, total_candidates });
+    terminal.cursorCol(0);
 
     // draw the prompt
     // TODO: handle display of queries longer than the screen width
     const query_width = try dw.strWidth(query.slice(), .half);
-    terminal.clearLine();
-    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(query.slice(), std.math.min(width - state.prompt_width, query_width)) });
-
-    // draw info if there is room
-    const separator_width = 1;
-    const spacing = @intCast(i32, width) - @intCast(i32, state.prompt_width + query_width + numDigits(candidates.len) + numDigits(total_candidates) + separator_width);
-    if (spacing >= 1) {
-        terminal.cursorRight(@intCast(usize, spacing));
-        terminal.print("{}/{}", .{ candidates.len, total_candidates });
-    }
+    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)) });
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
-    const cursor_width = try dw.strWidth(query.sliceRange(0, query.cursor), .half);
+    const cursor_width = try dw.strWidth(query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, query.cursor)), .half);
     terminal.cursorRight(std.math.min(width - 1, cursor_width + state.prompt_width));
 
     try terminal.writer.flush();
