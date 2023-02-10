@@ -76,33 +76,33 @@ test "collectCandidates excess whitespace" {
 /// returns a sorted slice of Candidates that match the query ready for display
 /// in a tui or output to stdout
 pub fn rankCandidates(
-    allocator: std.mem.Allocator,
+    ranked: []Candidate,
     candidates: []const []const u8,
     tokens: []const []const u8,
     keep_order: bool,
     plain: bool,
     case_sensitive: bool,
-) ![]Candidate {
-    var ranked = ArrayList(Candidate).init(allocator);
-
+) []Candidate {
     if (tokens.len == 0) {
-        for (candidates) |candidate| {
-            try ranked.append(.{ .str = candidate });
+        for (candidates) |candidate, index| {
+            ranked[index] = .{ .str = candidate };
         }
-        return ranked.toOwnedSlice();
+        return ranked;
     }
 
+    var index: usize = 0;
     for (candidates) |candidate| {
         if (rankCandidate(candidate, tokens, case_sensitive, plain)) |rank| {
-            try ranked.append(.{ .str = candidate, .rank = rank });
+            ranked[index] = .{ .str = candidate, .rank = rank };
+            index += 1;
         }
     }
 
     if (!keep_order) {
-        std.sort.sort(Candidate, ranked.items, {}, sort);
+        std.sort.sort(Candidate, ranked[0..index], {}, sort);
     }
 
-    return ranked.toOwnedSlice();
+    return ranked[0..index];
 }
 
 const indexOfCaseSensitive = std.mem.indexOfScalarPos;
@@ -369,8 +369,9 @@ fn testRankCandidates(
     candidates: []const []const u8,
     expected: []const []const u8,
 ) !void {
-    const ranked = try rankCandidates(testing.allocator, candidates, tokens, false, false, false);
-    defer testing.allocator.free(ranked);
+    var ranked_buf = try testing.allocator.alloc(Candidate, candidates.len);
+    defer testing.allocator.free(ranked_buf);
+    const ranked = rankCandidates(ranked_buf, candidates, tokens, false, false, false);
 
     for (expected) |expected_str, i| {
         if (!std.mem.eql(u8, expected_str, ranked[i].str)) {

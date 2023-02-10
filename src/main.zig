@@ -237,7 +237,8 @@ pub fn main() anyerror!void {
         var tokens_buf = try allocator.alloc([]const u8, 16);
         const tokens = ui.splitQuery(tokens_buf, config.query);
         const case_sensitive = ui.hasUpper(config.query);
-        const filtered = try filter.rankCandidates(allocator, candidates, tokens, config.keep_order, config.plain, case_sensitive);
+        var filtered_buf = try allocator.alloc(filter.Candidate, candidates.len);
+        const filtered = filter.rankCandidates(filtered_buf, candidates, tokens, config.keep_order, config.plain, case_sensitive);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
             try stdout.print("{s}\n", .{candidate.str});

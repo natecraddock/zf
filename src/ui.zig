@@ -349,6 +349,8 @@ pub fn run(
     var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());
     var case_sensitive: bool = hasUpper(query.slice());
 
+    var filtered_buf = try allocator.alloc(Candidate, candidates.len);
+
     var redraw = true;
 
     while (true) {
@@ -359,7 +361,7 @@ pub fn run(
             tokens = splitQuery(tokens_buf, (try normalizer.nfd(allocator, query.slice())).slice);
             case_sensitive = hasUpper(query.slice());
 
-            filtered = try filter.rankCandidates(allocator, candidates, tokens, keep_order, plain, case_sensitive);
+            filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, case_sensitive);
             redraw = true;
             state.selected = 0;
         }
