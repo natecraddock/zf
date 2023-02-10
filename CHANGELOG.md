@@ -1,6 +1,24 @@
 # master
 
-This release includes many fixes, refactors, optimizations, and unicode support.
+The headline feature of this release is strict path matching, another way that zf is optimized for filtering filepaths with accuracy and precision.
+
+With strict path matching, when a query token contains a `/` character, any other characters after the slash must appear in a single path segment. As an example, the query `/foo` would match `/foo/bar/` but not `/fo/obar` because the characters `"foo"` must appear in a single path segment.
+
+This is useful for narrowing down results when you know the exact path structure of your files. As a more complex example, with the following paths
+
+```
+app/models/foo/bar/baz.rb
+app/models/foo/bar-baz.rb
+app/models/foo-bar-baz.rb
+app/monsters/dungeon/foo/bar/baz.rb
+```
+
+The query `a/m/f/b/baz` filters to only `app/models/foo/bar/baz.rb` whereas in previous versions of zf the string `app/monsters/dungeon/foo/bar/baz.rb` is also included in the results. If you want to end strict path matching, just add a space to start a new token.
+
+This release also includes many fixes, refactors, optimizations, unicode support, and a few other small features. Here's an overview of the biggest changes:
+
+* **feat**: strict path matching
+  ([b414ad](https://github.com/natecraddock/zf/commit/b414ad))
 
 * **feat**: unicode support
   ([3e7069](https://github.com/natecraddock/zf/commit/3e7069))
@@ -12,7 +30,7 @@ This release includes many fixes, refactors, optimizations, and unicode support.
 * **feat**: add `ZF_HIGHLIGHT` environment variable to set highlight color
   ([3cf713](https://github.com/natecraddock/zf/commit/3cf713))
 
-  Adds a new environment variable to set the highlight color. Valid colors are: black, red, green, yellow, blue, magenta, cyan, white, bright_black, bright_red, bright_green, bright_yellow, bright_blue, bright_magenta, bright_cyan, and bright_white
+  Adds a new environment variable to set the highlight color. Valid colors are: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bright_black`, `bright_red`, `bright_green`, `bright_yellow`, `bright_blue`, `bright_magenta`, `bright_cyan`, and `bright_white`
 
 * **perf**: preallocate filtered candidate buffers
   ([c2a36ba](https://github.com/natecraddock/zf/commit/c2a36ba))
