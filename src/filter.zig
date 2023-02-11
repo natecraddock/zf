@@ -260,6 +260,15 @@ test "rankToken" {
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", false) != null);
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", false) != null);
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false) != null);
+
+    // strict path matching
+    try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "a/c", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false));
+
+    try testing.expect(rankToken("src/config/__init__.py", "__init__.py", "con/i", false) != null);
+    try testing.expect(rankToken("a/b/c/d", "d", "a/b/c", false) != null);
+    try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false) != null);
 }
 
 pub fn highlightToken(
