@@ -1,5 +1,7 @@
 # master
 
+# 0.7.0
+
 The headline feature of this release is strict path matching, another way that zf is optimized for filtering filepaths with accuracy and precision.
 
 With strict path matching, when a query token contains a `/` character, any other characters after the slash must appear in a single path segment. As an example, the query `/foo` would match `/foo/bar/` but not `/fo/obar` because the characters `"foo"` must appear in a single path segment.
@@ -13,7 +15,7 @@ app/models/foo-bar-baz.rb
 app/monsters/dungeon/foo/bar/baz.rb
 ```
 
-The query `a/m/f/b/baz` filters to only `app/models/foo/bar/baz.rb` whereas in previous versions of zf the string `app/monsters/dungeon/foo/bar/baz.rb` is also included in the results. If you want to end strict path matching, just add a space to start a new token.
+The query `a/m/f/b/baz` filters to only `app/models/foo/bar/baz.rb` whereas in previous versions of zf the string `app/monsters/dungeon/foo/bar/baz.rb` is also included in the results. To end strict path matching, just add a space to start a new token.
 
 This release also includes many fixes, refactors, optimizations, unicode support, and a few other small features. Here's an overview of the biggest changes:
 
