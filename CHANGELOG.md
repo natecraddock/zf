@@ -44,7 +44,7 @@ This release also includes many fixes, refactors, optimizations, unicode support
 
 
 * **fix**: escape ANSI codes in `ZF_PROMPT`
-  ([7d32ad](https://github.com/natecraddock/zf/commit/7d32ad))
+  ([e0118d](https://github.com/natecraddock/zf/commit/e0118d))
 
   This adds SGR ANSI escape code handling to `ZF_PROMPT`. It now correctly calculates the width of the prompt when ANSI codes are included. Currently only supports the SGR codes
 
