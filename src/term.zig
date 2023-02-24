@@ -40,6 +40,8 @@ pub const InputBuffer = union(enum) {
     backspace,
     delete,
     enter,
+    tab,
+    shift_tab,
     none,
 };
 
@@ -224,12 +226,14 @@ pub const Terminal = struct {
                             if (byte == '~') return .delete;
                             return .esc;
                         },
+                        'Z' => .shift_tab,
                         else => .esc,
                     };
                 }
 
                 return .esc;
             },
+            '\t' => return .tab,
             '\r' => return .enter,
             127 => return .backspace,
             else => {},

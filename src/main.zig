@@ -281,8 +281,10 @@ pub fn main() anyerror!void {
 
         try terminal.deinit();
 
-        if (selected) |str| {
-            try stdout.print("{s}\n", .{str});
+        if (selected) |selected_lines| {
+            for (selected_lines) |str| {
+                try stdout.print("{s}\n", .{str});
+            }
         } else std.process.exit(1);
     }
 }
@@ -313,6 +315,7 @@ pub fn readAll(allocator: std.mem.Allocator, reader: *std.fs.File.Reader) ![]u8 
 }
 
 test {
+    _ = @import("array_toggle_set.zig");
     _ = @import("clib.zig");
     _ = @import("EditBuffer.zig");
     _ = @import("filter.zig");

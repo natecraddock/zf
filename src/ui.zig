@@ -7,6 +7,7 @@ const ziglyph = @import("ziglyph");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
 const Range = filter.Range;
@@ -108,10 +109,11 @@ inline fn drawCandidate(
     tokens: [][]const u8,
     width: usize,
     selected: bool,
+    highlight: bool,
     case_sensitive: bool,
     plain: bool,
 ) void {
-    if (selected) terminal.sgr(.reverse);
+    if (highlight) terminal.sgr(.reverse);
     defer terminal.sgr(.reset);
 
     var ranges_buf: [16]Range = undefined;
@@ -120,6 +122,11 @@ inline fn drawCandidate(
 
     const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
     const str = graphemeWidthSlice(candidate.str, @min(width, str_width));
+
+    // TODO: handle overflow of lines when selected
+    if (selected) {
+        terminal.writeBytes("* ");
+    }
 
     // no highlights, just draw the string
     if (ranges.len == 0 or terminal.no_color) {
@@ -148,6 +155,7 @@ fn draw(
     query: *EditBuffer,
     tokens: [][]const u8,
     candidates: []Candidate,
+    selected_rows: ArrayToggleSet(usize),
     total_candidates: usize,
     case_sensitive: bool,
     plain: bool,
@@ -159,16 +167,36 @@ fn draw(
     while (line < terminal.height) : (line += 1) {
         terminal.cursorDown(1);
         terminal.clearLine();
-        if (line < candidates.len) drawCandidate(terminal, candidates[line + state.offset], tokens, width, line == state.selected, case_sensitive, plain);
+        if (line < candidates.len) drawCandidate(
+            terminal,
+            candidates[line + state.offset],
+            tokens,
+            width,
+            selected_rows.contains(line + state.offset),
+            line == state.selected,
+            case_sensitive,
+            plain,
+        );
     }
     terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
     terminal.clearLine();
 
     // draw the stats
-    const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-    terminal.cursorRight(width - stats_width);
-    terminal.print("{}/{}", .{ candidates.len, total_candidates });
+    const num_selected = selected_rows.slice().len;
+    const stats_width = blk: {
+        if (num_selected > 0) {
+            const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
+            terminal.cursorRight(width - stats_width);
+            terminal.print("{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
+            break :blk stats_width;
+        } else {
+            const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
+            terminal.cursorRight(width - stats_width);
+            terminal.print("{}/{}", .{ candidates.len, total_candidates });
+            break :blk stats_width;
+        }
+    };
     terminal.cursorCol(0);
 
     // draw the prompt
@@ -197,7 +225,9 @@ const Action = union(enum) {
     delete_word,
     delete_line,
     delete_line_forward,
-    select,
+    select_up,
+    select_down,
+    confirm,
     close,
     pass,
 };
@@ -239,7 +269,9 @@ fn inputToAction(input: term.InputBuffer, vi_mode: bool) Action {
         .down => .line_down,
         .left => .cursor_left,
         .right => .cursor_right,
-        .enter => .select,
+        .enter => .confirm,
+        .tab => .select_down,
+        .shift_tab => .select_up,
         .esc => .close,
         .none => .pass,
     };
@@ -322,7 +354,7 @@ pub fn run(
     plain: bool,
     prompt_str: []const u8,
     vi_mode: bool,
-) !?[]const u8 {
+) !?[]const []const u8 {
     var query = EditBuffer.init(allocator);
     defer query.deinit();
 
@@ -355,6 +387,8 @@ pub fn run(
 
     var redraw = true;
 
+    var selected_rows = ArrayToggleSet(usize).init(allocator);
+
     while (true) {
         // did the query change?
         if (query.dirty) {
@@ -372,7 +406,7 @@ pub fn run(
         // do we need to redraw?
         if (redraw) {
             redraw = false;
-            try draw(terminal, &state, &query, tokens, filtered, candidates.len, case_sensitive, plain);
+            try draw(terminal, &state, &query, tokens, filtered, selected_rows, candidates.len, case_sensitive, plain);
         }
 
         const visible_rows = std.math.min(terminal.height, filtered.len);
@@ -392,29 +426,40 @@ pub fn run(
             .delete_line_forward => query.deleteTo(query.len),
             .backspace => query.delete(1, .left),
             .delete => query.delete(1, .right),
-            .line_up => if (state.selected > 0) {
-                state.selected -= 1;
-            } else if (state.offset > 0) {
-                state.offset -= 1;
-            },
-            .line_down => if (state.selected < visible_rows - 1) {
-                state.selected += 1;
-            } else if (state.offset < filtered.len - visible_rows) {
-                state.offset += 1;
-            },
+            .line_up => lineUp(&state),
+            .line_down => lineDown(&state, visible_rows, filtered.len - visible_rows),
             .cursor_left => query.moveCursor(1, .left),
             .cursor_leftmost => query.setCursor(0),
             .cursor_rightmost => query.setCursor(query.len),
             .cursor_right => query.moveCursor(1, .right),
-            .select => {
+            .select_up => {
+                try selected_rows.toggle(state.selected + state.offset);
+                lineUp(&state);
+                redraw = true;
+            },
+            .select_down => {
+                try selected_rows.toggle(state.selected + state.offset);
+                lineDown(&state, visible_rows, filtered.len - visible_rows);
+                redraw = true;
+            },
+            .confirm => {
                 if (filtered.len == 0) break;
-                return filtered[state.selected + state.offset].str;
+                if (selected_rows.slice().len > 0) {
+                    var selected_buf = try allocator.alloc([]const u8, selected_rows.slice().len);
+                    for (selected_rows.slice()) |index, i| {
+                        selected_buf[i] = filtered[index].str;
+                    }
+                    return selected_buf;
+                }
+                var selected_buf = try allocator.alloc([]const u8, 1);
+                selected_buf[0] = filtered[state.selected + state.offset].str;
+                return selected_buf;
             },
             .close => break,
             .pass => {},
         }
 
-        redraw = last_cursor != query.cursor or last_selected != state.selected or last_offset != state.offset;
+        redraw = redraw or last_cursor != query.cursor or last_selected != state.selected or last_offset != state.offset;
     }
 
     return null;
@@ -443,4 +488,20 @@ fn deleteWord(query: *EditBuffer) void {
     if (last_index) |index| {
         query.deleteTo(query.bufferIndexToCursor(index + 1));
     } else query.deleteTo(0);
+}
+
+fn lineUp(state: *State) void {
+    if (state.selected > 0) {
+        state.selected -= 1;
+    } else if (state.offset > 0) {
+        state.offset -= 1;
+    }
+}
+
+fn lineDown(state: *State, visible_rows: usize, num_truncated :usize) void {
+    if (state.selected < visible_rows - 1) {
+        state.selected += 1;
+    } else if (state.offset < num_truncated) {
+        state.offset += 1;
+    }
 }
