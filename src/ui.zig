@@ -16,6 +16,7 @@ const term = @import("term.zig");
 
 const State = struct {
     selected: usize,
+    offset: usize,
     prompt: []const u8,
     prompt_width: usize,
 };
@@ -158,7 +159,7 @@ fn draw(
     while (line < terminal.height) : (line += 1) {
         terminal.cursorDown(1);
         terminal.clearLine();
-        if (line < candidates.len) drawCandidate(terminal, candidates[line], tokens, width, line == state.selected, case_sensitive, plain);
+        if (line < candidates.len) drawCandidate(terminal, candidates[line + state.offset], tokens, width, line == state.selected, case_sensitive, plain);
     }
     terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
@@ -327,6 +328,7 @@ pub fn run(
 
     var state = State{
         .selected = 0,
+        .offset = 0,
         .prompt = prompt_str,
         .prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half),
     };
@@ -364,6 +366,7 @@ pub fn run(
             filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, case_sensitive);
             redraw = true;
             state.selected = 0;
+            state.offset = 0;
         }
 
         // do we need to redraw?
@@ -372,7 +375,7 @@ pub fn run(
             try draw(terminal, &state, &query, tokens, filtered, candidates.len, case_sensitive, plain);
         }
 
-        const visible_rows = @intCast(i64, std.math.min(terminal.height, filtered.len));
+        const visible_rows = std.math.min(terminal.height, filtered.len);
 
         var buf: [2048]u8 = undefined;
         const input = try terminal.read(&buf);
@@ -380,6 +383,7 @@ pub fn run(
 
         const last_cursor = query.cursor;
         const last_selected = state.selected;
+        const last_offset = state.offset;
 
         switch (action) {
             .str => |str| try query.insert(str),
@@ -390,9 +394,13 @@ pub fn run(
             .delete => query.delete(1, .right),
             .line_up => if (state.selected > 0) {
                 state.selected -= 1;
+            } else if (state.offset > 0) {
+                state.offset -= 1;
             },
             .line_down => if (state.selected < visible_rows - 1) {
                 state.selected += 1;
+            } else if (state.offset < filtered.len - visible_rows) {
+                state.offset += 1;
             },
             .cursor_left => query.moveCursor(1, .left),
             .cursor_leftmost => query.setCursor(0),
@@ -400,13 +408,13 @@ pub fn run(
             .cursor_right => query.moveCursor(1, .right),
             .select => {
                 if (filtered.len == 0) break;
-                return filtered[state.selected].str;
+                return filtered[state.selected + state.offset].str;
             },
             .close => break,
             .pass => {},
         }
 
-        redraw = last_cursor != query.cursor or last_selected != state.selected;
+        redraw = last_cursor != query.cursor or last_selected != state.selected or last_offset != state.offset;
     }
 
     return null;
