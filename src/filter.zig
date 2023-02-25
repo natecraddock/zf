@@ -150,7 +150,7 @@ const IndexIterator = struct {
 /// rank a candidate against the given query tokens
 ///
 /// algorithm inspired by https://github.com/garybernhardt/selecta
-fn rankCandidate(
+pub fn rankCandidate(
     candidate: []const u8,
     query_tokens: []const []const u8,
     case_sensitive: bool,

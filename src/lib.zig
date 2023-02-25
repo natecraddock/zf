@@ -5,17 +5,11 @@ const testing = std.testing;
 /// rank a given string against a slice of tokens
 pub fn rank(
     str: []const u8,
-    filename: ?[]const u8,
     tokens: []const []const u8,
     case_sensitive: bool,
-) f64 {
-    var total_rank: f64 = 0;
-    for (tokens) |token| {
-        if (filter.rankToken(str, filename, token, case_sensitive)) |r| {
-            total_rank += r;
-        } else return -1.0;
-    }
-    return total_rank;
+    plain: bool,
+) ?f64 {
+    return filter.rankCandidate(str, tokens, case_sensitive, plain);
 }
 
 /// rank a given string against a single token
@@ -29,12 +23,12 @@ pub fn rankToken(
 }
 
 test "rank library interface" {
-    try testing.expect(rank("abcdefg", null, &.{ "a", "z" }, false) == -1);
-    try testing.expect(rank("abcdefg", null, &.{ "a", "b" }, false) != -1);
-    try testing.expect(rank("abcdefg", null, &.{ "a", "B" }, true) == -1);
-    try testing.expect(rank("aBcdefg", null, &.{ "a", "B" }, true) != -1);
-    try testing.expect(rank("a/path/to/file", "file", &.{"zig"}, false) == -1);
-    try testing.expect(rank("a/path/to/file", "file", &.{ "path", "file" }, false) != -1);
+    try testing.expect(rank("abcdefg", &.{ "a", "z" }, false, false) == null);
+    try testing.expect(rank("abcdefg", &.{ "a", "b" }, false, false) != null);
+    try testing.expect(rank("abcdefg", &.{ "a", "B" }, true, false) == null);
+    try testing.expect(rank("aBcdefg", &.{ "a", "B" }, true, false) != null);
+    try testing.expect(rank("a/path/to/file", &.{"zig"}, false, false) == null);
+    try testing.expect(rank("a/path/to/file", &.{ "path", "file" }, false, false) != null);
 
     try testing.expect(rankToken("abcdefg", null, "a", false) != null);
     try testing.expect(rankToken("abcdefg", null, "z", false) == null);
@@ -50,11 +44,12 @@ pub const Range = filter.Range;
 /// compute matching ranges given a string and a slice of tokens
 pub fn highlight(
     str: []const u8,
-    filename: ?[]const u8,
     ranges: []Range,
     tokens: []const []const u8,
     case_sensitive: bool,
+    plain: bool,
 ) void {
+    const filename = if (plain) null else std.fs.path.basename(str);
     for (tokens) |token, i| {
         ranges[i] = filter.highlightToken(str, filename, token, case_sensitive);
     }
@@ -73,20 +68,20 @@ pub fn highlightToken(
 fn testHighlight(
     expectedRanges: []const Range,
     str: []const u8,
-    filename: ?[]const u8,
     tokens: []const []const u8,
     case_sensitive: bool,
+    plain: bool,
 ) !void {
     var ranges = try testing.allocator.alloc(Range, tokens.len);
     defer testing.allocator.free(ranges);
-    highlight(str, filename, ranges, tokens, case_sensitive);
+    highlight(str, ranges, tokens, case_sensitive, plain);
     try testing.expectEqualSlices(Range, expectedRanges, ranges);
 }
 
 test "highlight library interface" {
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdef", null, &.{ "a", "f" }, false);
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdeF", null, &.{ "a", "F" }, true);
-    try testHighlight(&.{ .{ .start = 2, .end = 5 }, .{ .start = 10, .end = 13 } }, "a/path/to/file", "file", &.{ "path", "file" }, false);
+    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdef", &.{ "a", "f" }, false, false);
+    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdeF", &.{ "a", "F" }, true, false);
+    try testHighlight(&.{ .{ .start = 2, .end = 5 }, .{ .start = 10, .end = 13 } }, "a/path/to/file", &.{ "path", "file" }, false, false);
 
     try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("abcdef", null, "a", false));
     try testing.expectEqual(Range{ .start = 5, .end = 5 }, highlightToken("abcdeF", null, "F", true));
