@@ -121,9 +121,8 @@ inline fn drawCandidate(
     const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, case_sensitive);
 
     const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
-    const str = graphemeWidthSlice(candidate.str, @min(width, str_width));
+    const str = graphemeWidthSlice(candidate.str, @min(width - @as(usize, if (selected) 2 else 0), str_width));
 
-    // TODO: handle overflow of lines when selected
     if (selected) {
         terminal.writeBytes("* ");
     }
