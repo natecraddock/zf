@@ -8,6 +8,8 @@ zf is a simple, general-purpose fuzzy finder that prioritizes matches on filenam
 
 zf reads a list of newline separated strings on stdin and displays an interactive interface. Pressing enter outputs the selected line on stdout. Text may be entered to filter the list of strings.
 
+Multiple lines may be marked as selected with `tab` and `shift-tab`. When multiple lines are selected, pressing enter outputs only the marked lines to stdout.
+
 Each whitespace-separated term in the query string is used separately to narrow down the search results. For example, searching for "init config" will select all results that match both "init" and "config". Note that the query is restricted to a maximum of 16 whitespace-separated tokens.
 
 Matching is case insensitive unless an uppercase letter is found in the query.
@@ -38,13 +40,17 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 ## COMMANDS
 
-`enter`: Write the selected line to stdout and exit
+`enter`: Write the selected line or all marked lines to stdout and exit
 
 `escape, ctrl-c`: Exit zf without selecting anything
 
 `up, ctrl-p, ctrl-k`: Select the next line up (`ctrl-k` only when `ZF_VI_MODE` is enabled)
 
 `down ctrl-n, ctrl-j`: Select the next line down
+
+`tab`: Mark the current line as selected and select the next line
+
+`shift-tab`: Mark the current line as selected and select the previous line
 
 `left, ctrl-b`: Move the cursor left
 

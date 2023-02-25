@@ -1,5 +1,18 @@
 # master
 
+* **feat**: add multiselect support
+  ([e19409](https://github.com/natecraddock/zf/commit/b414ad))
+
+  Adds the ability to select and deselect candidates. Selection is toggled with <kbd>Tab</kbd>. The selected line is moved down with <kbd>Tab</kbd>, and moved up with <kbd>Shift Tab</kbd>. If any lines are selected, the number selected is displayed in the top
+  right of the UI.
+
+  Lines are written to stdout separated by newlines. This may be configurable in the future.
+
+* **feat**: allow scrolling the list of candidates
+  ([4ea08e](https://github.com/natecraddock/zf/commit/b414ad))
+
+  When the list of candidates is larger than the terminal height or configured display lines (default 10), moving the selected line past the bottom will now scroll the list. This means any item can be selected with the arrow keys alone.
+
 # 0.7.0
 
 The headline feature of this release is strict path matching, another way that zf is optimized for filtering filepaths with accuracy and precision.

@@ -14,6 +14,9 @@ zf reads a list of newline separated strings on stdin and displays an
 interactive interface. Pressing enter outputs the selected line on stdout. Text
 may be entered to filter the list of strings.
 
+Multiple lines may be marked as selected with tab and shift-tab. When multiple
+lines are selected, pressing enter outputs only the marked lines to stdout.
+
 Each whitespace-separated term in the query string is used separately to narrow
 down the search results. For example, searching for "init config" will select
 all results that match both "init" and "config". Note that the query is restricted
@@ -72,7 +75,7 @@ Disables colors. See https://no-color.org
 
 .TP
 .BR enter
-Write the selected line to stdout and exit
+Write the selected line or all marked lines to stdout and exit
 
 .TP
 .BR "escape, ctrl-c"
@@ -85,6 +88,14 @@ Select the next line up
 .TP
 .BR "down ctrl-n, ctrl-j"
 Select the next line down
+
+.TP
+.BR "tab"
+Mark the current line as selected and select the next line
+
+.TP
+.BR shift-tab
+Mark the current line as selected and select the previous line
 
 .TP
 .BR "left, ctrl-b"
