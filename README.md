@@ -12,6 +12,7 @@ Zf is an interactive commandline fuzzy finder that prioritizes matches on filena
 * also functions as a general purpose fuzzy finder for arbitrary strings
 * refine search results with whitespace separated query terms
 * case insensitive unless the query contains uppercase letters (smartcase)
+* multiselect to output multiple selected lines
 * Zig and C libraries for the zf ranking algorithm
 
 Zf aims to be simple:
