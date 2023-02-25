@@ -23,6 +23,10 @@ pub fn ArrayToggleSet(comptime T: type) type {
             as.set.deinit();
         }
 
+        pub fn clear(as: *This) void {
+            as.set.clearRetainingCapacity();
+        }
+
         pub fn toggle(as: *This, item: T) !void {
             for (as.set.items) |i, index| {
                 if (item == i) {
@@ -94,4 +98,7 @@ test "removal ArrayToggleSet" {
     try items.toggle(100);
     try items.toggle(3);
     try testing.expectEqualSlices(u8, &.{ 1, 2, 3, 4, 100 }, items.slice());
+
+    items.clear();
+    try testing.expectEqualSlices(u8, &.{}, items.slice());
 }

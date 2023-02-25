@@ -401,6 +401,7 @@ pub fn run(
             redraw = true;
             state.selected = 0;
             state.offset = 0;
+            selected_rows.clear();
         }
 
         // do we need to redraw?
