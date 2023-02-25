@@ -38,21 +38,23 @@ test "rank library interface" {
     try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == null);
 }
 
-/// a start and ending index for a token match
-pub const Range = filter.Range;
-
 /// compute matching ranges given a string and a slice of tokens
 pub fn highlight(
     str: []const u8,
-    ranges: []Range,
     tokens: []const []const u8,
     case_sensitive: bool,
     plain: bool,
-) void {
+    matches: []usize,
+) []usize {
     const filename = if (plain) null else std.fs.path.basename(str);
-    for (tokens) |token, i| {
-        ranges[i] = filter.highlightToken(str, filename, token, case_sensitive);
+
+    var index: usize = 0;
+    for (tokens) |token| {
+        const matched = filter.highlightToken(str, filename, token, case_sensitive, matches[index..]);
+        index += matched.len;
     }
+
+    return matches[0..index];
 }
 
 /// compute matching ranges given a string and a single token
@@ -61,33 +63,34 @@ pub fn highlightToken(
     filename: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
-) Range {
-    return filter.highlightToken(str, filename, token, case_sensitive);
-}
-
-fn testHighlight(
-    expectedRanges: []const Range,
-    str: []const u8,
-    tokens: []const []const u8,
-    case_sensitive: bool,
-    plain: bool,
-) !void {
-    var ranges = try testing.allocator.alloc(Range, tokens.len);
-    defer testing.allocator.free(ranges);
-    highlight(str, ranges, tokens, case_sensitive, plain);
-    try testing.expectEqualSlices(Range, expectedRanges, ranges);
+    matches: []usize,
+) []const usize {
+    return filter.highlightToken(str, filename, token, case_sensitive, matches);
 }
 
 test "highlight library interface" {
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdef", &.{ "a", "f" }, false, false);
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdeF", &.{ "a", "F" }, true, false);
-    try testHighlight(&.{ .{ .start = 2, .end = 5 }, .{ .start = 10, .end = 13 } }, "a/path/to/file", &.{ "path", "file" }, false, false);
+    var matches_buf: [128]usize = undefined;
 
-    try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("abcdef", null, "a", false));
-    try testing.expectEqual(Range{ .start = 5, .end = 5 }, highlightToken("abcdeF", null, "F", true));
-    try testing.expectEqual(Range{ .start = 10, .end = 13 }, highlightToken("a/path/to/file", "file", "file", false));
+    try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdef", &.{ "a", "f" }, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdeF", &.{ "a", "F" }, true, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 2, 3, 4, 5, 10, 11, 12, 13 }, highlight("a/path/to/file", &.{ "path", "file" }, false, false, &matches_buf));
+
+    try testing.expectEqualSlices(usize, &.{0}, highlightToken("abcdef", null, "a", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", null, "F", true, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, highlightToken("a/path/to/file", "file", "file", false, &matches_buf));
 
     // highlights with basename trailing slashes
-    try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("s/", "s", "s", false));
-    try testing.expectEqual(Range{ .start = 20, .end = 23 }, highlightToken("/this/is/path/not/a/file/", "file", "file", false));
+    try testing.expectEqualSlices(usize, &.{0}, highlightToken("s/", "s", "s", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 20, 21, 22, 23 }, highlightToken("/this/is/path/not/a/file/", "file", "file", false, &matches_buf));
+
+    // disconnected highlights
+    try testing.expectEqualSlices(usize, &.{ 0, 2, 3 }, highlight("ababab", &.{"aab"}, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 6, 8, 9 }, highlight("abbbbbabab", &.{"aab"}, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 0, 2, 6 }, highlight("abcdefg", &.{"acg"}, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 2, 3, 4, 5, 9, 10 }, highlight("__init__.py", &.{"initpy"}, false, false, &matches_buf));
+
+    // small buffer to ensure highlighting doesn't go out of range when the tokens overflow
+    var small_buf: [4]usize = undefined;
+    try testing.expectEqualSlices(usize, &.{0, 1, 2, 3}, highlight("abcd", &.{"ab", "cd", "abcd"}, false, false, &small_buf));
+    try testing.expectEqualSlices(usize, &.{0, 1, 2, 1}, highlight("wxyz", &.{"wxy", "xyz"}, false, false, &small_buf));
 }

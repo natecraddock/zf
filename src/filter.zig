@@ -1,17 +1,12 @@
 const std = @import("std");
-const ArrayList = std.ArrayList;
 const testing = std.testing;
+
+const ArrayList = std.ArrayList;
 
 /// Candidates are the strings read from stdin
 pub const Candidate = struct {
     str: []const u8,
     rank: f64 = 0,
-};
-
-/// Packed so it can be exported via the C ABI
-pub const Range = packed struct {
-    start: usize = 0,
-    end: usize = 0,
 };
 
 /// read the candidates from the buffer
@@ -187,10 +182,8 @@ pub fn rankToken(
     if (filenameOrNull) |filename| {
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
-                if (best_rank == null or match.rank < best_rank.?) {
-                    best_rank = match.rank;
-                }
+            if (scanToEnd(filename, token[1..], start_index, 0, null, case_sensitive, token[0] == '/')) |rank| {
+                if (best_rank == null or rank < best_rank.?) best_rank = rank;
             } else if (token[0] != '/') break;
         }
 
@@ -213,10 +206,8 @@ pub fn rankToken(
     // perform search on the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
-            if (best_rank == null or match.rank < best_rank.?) {
-                best_rank = match.rank;
-            }
+        if (scanToEnd(str, token[1..], start_index, 0, null, case_sensitive, token[0] == '/')) |rank| {
+            if (best_rank == null or rank < best_rank.?) best_rank = rank;
         } else if (token[0] != '/') break;
     }
 
@@ -271,51 +262,101 @@ test "rankToken" {
     try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false) != null);
 }
 
+/// A simple, append-only array list backed by a fixed buffer
+pub fn FixedArrayList(comptime T: type) type {
+    return struct {
+        buffer: []T,
+        len: usize = 0,
+
+        const This = @This();
+
+        pub fn init(buffer: []T) This {
+            return .{ .buffer = buffer };
+        }
+
+        pub fn append(list: *This, data: T) void {
+            if (list.len >= list.buffer.len) return;
+            list.buffer[list.len] = data;
+            list.len += 1;
+        }
+
+        pub fn clear(list: *This) void {
+            list.len = 0;
+        }
+
+        pub fn slice(list: This) []const T {
+            return list.buffer[0..list.len];
+        }
+    };
+}
+
+test "FixedArrayList" {
+    var buffer: [4]usize = undefined;
+    var list = FixedArrayList(usize).init(&buffer);
+
+    list.append(1);
+    list.append(2);
+    list.append(3);
+    list.append(4);
+    list.append(5);
+    try testing.expectEqualSlices(usize, &.{ 1, 2, 3, 4 }, list.slice());
+
+    list.clear();
+    try testing.expectEqualSlices(usize, &.{}, list.slice());
+}
+
 pub fn highlightToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
-) Range {
+    matches: []usize,
+) []const usize {
     var best_rank: ?f64 = null;
-    var range: Range = .{};
+
+    // Working memory for computing matches
+    var buf: [512]usize = undefined;
+    var matched = FixedArrayList(usize).init(&buf);
+    var best_matched = FixedArrayList(usize).init(matches);
 
     // highlight on the filename if requested
     if (filenameOrNull) |filename| {
-        // The basename doesn't include trailing slashes so if the string ends in a slash the offset
-        // will be off by one
-        const offs = str.len - filename.len - @as(usize, if (str[str.len - 1] == '/') 1 else 0);
+        // The basename doesn't include trailing slashes so if the string ends in a slash the offset will be off by one
+        const offset = str.len - filename.len - @as(usize, if (str[str.len - 1] == '/') 1 else 0);
+
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
-                if (best_rank == null or match.rank < best_rank.?) {
-                    best_rank = match.rank;
-                    range = .{ .start = match.start + offs, .end = match.end + offs };
+            matched.append(start_index + offset);
+
+            if (scanToEnd(filename, token[1..], start_index, offset, &matched, case_sensitive, token[0] == '/')) |rank| {
+                if (best_rank == null or rank < best_rank.?) {
+                    best_rank = rank;
+                    best_matched.clear();
+                    for (matched.slice()) |index| best_matched.append(index);
                 }
             } else if (token[0] != '/') break;
+            matched.clear();
         }
-        if (best_rank != null) return range;
+        if (best_rank != null) return best_matched.slice();
     }
 
     // highlight the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, case_sensitive, token[0] == '/')) |match| {
-            if (best_rank == null or match.rank < best_rank.?) {
-                best_rank = match.rank;
-                range = .{ .start = match.start, .end = match.end };
+        matched.append(start_index);
+
+        if (scanToEnd(str, token[1..], start_index, 0, &matched, case_sensitive, token[0] == '/')) |rank| {
+            if (best_rank == null or rank < best_rank.?) {
+                best_rank = rank;
+                best_matched.clear();
+                for (matched.slice()) |index| best_matched.append(index);
             }
         } else if (token[0] != '/') break;
+        matched.clear();
     }
 
-    return range;
+    return best_matched.slice();
 }
-
-const Match = struct {
-    rank: f64,
-    start: usize,
-    end: usize,
-};
 
 inline fn isStartOfWord(byte: u8) bool {
     return switch (byte) {
@@ -330,17 +371,19 @@ fn scanToEnd(
     str: []const u8,
     token: []const u8,
     start_index: usize,
+    offset: usize,
+    matched_indices: ?*FixedArrayList(usize),
     case_sensitive: bool,
     start_strict_path_match: bool,
-) ?Match {
-    var match: Match = .{ .rank = 1, .start = start_index, .end = 0 };
+) ?f64 {
+    var rank: f64 = 1;
     var last_index = start_index;
     var last_sequential = false;
     var strict_path_match = start_strict_path_match;
 
     // penalty for not starting on a word boundary
     if (start_index > 0 and !isStartOfWord(str[start_index - 1])) {
-        match.rank += 2.0;
+        rank += 2.0;
     }
 
     for (token) |c| {
@@ -349,31 +392,32 @@ fn scanToEnd(
         else
             indexOf(u8, str, last_index + 1, c, strict_path_match, false);
 
-        if (index == null) return null;
+        if (index) |idx| {
+            if (matched_indices != null) matched_indices.?.append(idx + offset);
 
-        if (index.? == last_index + 1) {
-            // sequential matches only count the first character
-            if (!last_sequential) {
-                last_sequential = true;
-                match.rank += 1.0;
+            if (idx == last_index + 1) {
+                // sequential matches only count the first character
+                if (!last_sequential) {
+                    last_sequential = true;
+                    rank += 1.0;
+                }
+            } else {
+                // penalty for not starting on a word boundary
+                if (!isStartOfWord(str[idx - 1])) {
+                    rank += 2.0;
+                }
+
+                // normal match
+                last_sequential = false;
+                rank += @intToFloat(f64, idx - last_index);
             }
-        } else {
-            // penalty for not starting on a word boundary
-            if (!isStartOfWord(str[index.? - 1])) {
-                match.rank += 2.0;
-            }
 
-            // normal match
-            last_sequential = false;
-            match.rank += @intToFloat(f64, index.? - last_index);
-        }
-
-        last_index = index.?;
-        if (c == '/') strict_path_match = true;
+            last_index = idx;
+            if (c == '/') strict_path_match = true;
+        } else return null;
     }
 
-    match.end = last_index;
-    return match;
+    return rank;
 }
 
 fn sort(_: void, a: Candidate, b: Candidate) bool {

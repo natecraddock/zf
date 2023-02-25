@@ -73,24 +73,28 @@ test "rank exported C library interface" {
     try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == -1);
 }
 
-const Range = filter.Range;
-
 export fn highlight(
     str: [*:0]const u8,
-    ranges: [*]Range,
     tokens: [*]const [*:0]const u8,
-    num: usize,
+    tokens_len: usize,
     case_sensitive: bool,
     plain: bool,
-) void {
+    matches: [*]usize,
+    matches_len: usize,
+) usize {
     const string = std.mem.span(str);
     const filename = if (plain) null else std.fs.path.basename(string);
+    var matches_slice = matches[0..matches_len];
 
     var index: usize = 0;
-    while (index < num) : (index += 1) {
-        const token = std.mem.span(tokens[index]);
-        ranges[index] = filter.highlightToken(string, filename, token, case_sensitive);
+    var token_index: usize = 0;
+    while (token_index < tokens_len) : (token_index += 1) {
+        const token = std.mem.span(tokens[token_index]);
+        const matched = filter.highlightToken(string, filename, token, case_sensitive, matches_slice[index..]);
+        index += matched.len;
     }
+
+    return index;
 }
 
 export fn highlightToken(
@@ -98,32 +102,57 @@ export fn highlightToken(
     filename: ?[*:0]const u8,
     token: [*:0]const u8,
     case_sensitive: bool,
-) Range {
+    matches: [*]usize,
+    matches_len: usize,
+) usize {
     const string = std.mem.span(str);
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
-    return filter.highlightToken(string, name, tok, case_sensitive);
+    var matches_slice = matches[0..matches_len];
+    const matched = filter.highlightToken(string, name, tok, case_sensitive, matches_slice);
+    return matched.len;
 }
 
 fn testHighlight(
-    expectedRanges: []const Range,
+    expectedMatches: []const usize,
     str: [*:0]const u8,
     tokens: []const [*:0]const u8,
     case_sensitive: bool,
     plain: bool,
+    matches_buf: []usize,
 ) !void {
-    var ranges = try testing.allocator.alloc(Range, tokens.len);
-    defer testing.allocator.free(ranges);
-    highlight(str, ranges.ptr, tokens.ptr, ranges.len, case_sensitive, plain);
-    try testing.expectEqualSlices(Range, expectedRanges, ranges);
+    const len = highlight(str, tokens.ptr, tokens.len, case_sensitive, plain, matches_buf.ptr, matches_buf.len);
+    try testing.expectEqualSlices(usize, expectedMatches, matches_buf[0..len]);
 }
 
 test "highlight exported C library interface" {
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdef", &.{ "a", "f" }, false, false);
-    try testHighlight(&.{ .{ .start = 0, .end = 0 }, .{ .start = 5, .end = 5 } }, "abcdeF", &.{ "a", "F" }, true, false);
-    try testHighlight(&.{ .{ .start = 2, .end = 5 }, .{ .start = 10, .end = 13 } }, "a/path/to/file", &.{ "path", "file" }, false, false);
+    var matches_buf: [128]usize = undefined;
 
-    try testing.expectEqual(Range{ .start = 0, .end = 0 }, highlightToken("abcdef", null, "a", false));
-    try testing.expectEqual(Range{ .start = 5, .end = 5 }, highlightToken("abcdeF", null, "F", true));
-    try testing.expectEqual(Range{ .start = 10, .end = 13 }, highlightToken("a/path/to/file", "file", "file", false));
+    try testHighlight(&.{ 0, 5 }, "abcdef", &.{ "a", "f" }, false, false, &matches_buf);
+    try testHighlight(&.{ 0, 5 }, "abcdeF", &.{ "a", "F" }, true, false, &matches_buf);
+    try testHighlight(&.{ 2, 3, 4, 5, 10, 11, 12, 13 }, "a/path/to/file", &.{ "path", "file" }, false, false, &matches_buf);
+
+    var len = highlightToken("abcdef", null, "a", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{0}, matches_buf[0..len]);
+    len = highlightToken("abcdeF", null, "F", true, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{5}, matches_buf[0..len]);
+    len = highlightToken("a/path/to/file", "file", "file", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, matches_buf[0..len]);
+
+    // highlights with basename trailing slashes
+    len = highlightToken("s/", "s", "s", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{0}, matches_buf[0..len]);
+    len = highlightToken("/this/is/path/not/a/file/", "file", "file", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{ 20, 21, 22, 23 }, matches_buf[0..len]);
+
+    // disconnected highlights
+    try testHighlight(&.{ 0, 2, 3 }, "ababab", &.{"aab"}, false, false, &matches_buf);
+    try testHighlight(&.{ 6, 8, 9 }, "abbbbbabab", &.{"aab"}, false, false, &matches_buf);
+    try testHighlight(&.{ 0, 2, 6 }, "abcdefg", &.{"acg"}, false, false, &matches_buf);
+    try testHighlight(&.{ 2, 3, 4, 5, 9, 10 }, "__init__.py", &.{"initpy"}, false, false, &matches_buf);
+
+    // small buffer to ensure highlighting doesn't go out of range when the tokens overflow
+    var small_buf: [4]usize = undefined;
+    try testHighlight(&.{0, 1, 2, 3}, "abcd", &.{"ab", "cd", "abcd"}, false, false, &small_buf);
+    try testHighlight(&.{0, 1, 2, 1}, "wxyz", &.{"wxy", "xyz"}, false, false, &small_buf);
 }
