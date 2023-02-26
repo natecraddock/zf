@@ -340,6 +340,8 @@ pub fn highlightToken(
         if (best_rank != null) return best_matched.slice();
     }
 
+    matched.clear();
+
     // highlight the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {

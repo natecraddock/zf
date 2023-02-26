@@ -74,6 +74,7 @@ test "highlight library interface" {
     try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdef", &.{ "a", "f" }, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdeF", &.{ "a", "F" }, true, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{ 2, 3, 4, 5, 10, 11, 12, 13 }, highlight("a/path/to/file", &.{ "path", "file" }, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 4, 5, 6, 7, 8, 9, 10 }, highlight("lib/ziglyph/zig.mod", &.{"ziglyph"}, false, false, &matches_buf));
 
     try testing.expectEqualSlices(usize, &.{0}, highlightToken("abcdef", null, "a", false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", null, "F", true, &matches_buf));
