@@ -10,7 +10,6 @@ const ArrayList = std.ArrayList;
 const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
-const Range = filter.Range;
 const Terminal = term.Terminal;
 
 const term = @import("term.zig");
@@ -22,73 +21,53 @@ const State = struct {
     prompt_width: usize,
 };
 
-const HighlightSlice = struct {
-    str: []const u8,
+const HighlightSlicer = struct {
+    matches: []const usize,
     highlight: bool,
-};
-
-const Slicer = struct {
-    index: usize = 0,
     str: []const u8,
-    ranges: []Range,
+    index: usize = 0,
 
-    fn init(str: []const u8, ranges: []Range) Slicer {
-        return .{
-            .str = str,
-            .ranges = ranges,
-        };
+    const Slice = struct {
+        str: []const u8,
+        highlight: bool,
+    };
+
+    pub fn init(str: []const u8, matches: []const usize) HighlightSlicer {
+        const highlight = std.mem.indexOfScalar(usize, matches, 0) != null;
+        return .{ .str = str, .matches = matches, .highlight = highlight };
     }
 
-    fn nextRange(slicer: *Slicer) ?*Range {
-        var next_range: ?*Range = null;
-        for (slicer.ranges) |*r| {
-            if (r.start >= slicer.index) {
-                if (next_range == null or r.start < next_range.?.start) {
-                    next_range = r;
-                } else if (r.start == next_range.?.start and r.end > next_range.?.end) {
-                    next_range = r;
-                }
-            }
-        }
-        return next_range;
-    }
-
-    fn next(slicer: *Slicer) ?HighlightSlice {
+    pub fn next(slicer: *HighlightSlicer) ?Slice {
         if (slicer.index >= slicer.str.len) return null;
 
-        var highlight = false;
-        const str = if (slicer.nextRange()) |range| blk: {
-            // next highlight range past the visible end of the string
-            if (range.start >= slicer.str.len) {
-                break :blk slicer.str[slicer.index..];
-            }
+        const start_state = slicer.highlight;
+        var index: usize = slicer.index;
+        while (index < slicer.str.len) : (index += 1) {
+            const highlight = std.mem.indexOfScalar(usize, slicer.matches, index) != null;
+            if (start_state != highlight) break;
+        }
 
-            if (slicer.index == range.start) {
-                // inside highlight range
-                highlight = true;
-                break :blk slicer.str[range.start..std.math.min(slicer.str.len, range.end + 1)];
-            } else {
-                // before a highlight range
-                break :blk slicer.str[slicer.index..std.math.min(slicer.str.len, range.start)];
-            }
-        } else slicer.str[slicer.index..];
-
-        slicer.index += str.len;
-        return HighlightSlice{ .str = str, .highlight = highlight };
+        const slice = Slice{ .str = slicer.str[slicer.index..index] , .highlight = slicer.highlight };
+        slicer.highlight = !slicer.highlight;
+        slicer.index = index;
+        return slice;
     }
 };
 
-fn computeRanges(
+fn calculateHighlights(
     str: []const u8,
     filenameOrNull: ?[]const u8,
-    ranges: []Range,
     tokens: [][]const u8,
     case_sensitive: bool,
-) []Range {
-    for (tokens) |token, i| {
-        ranges[i] = filter.highlightToken(str, filenameOrNull, token, case_sensitive);
+    matches: []usize,
+) []usize {
+    var index: usize = 0;
+    for (tokens) |token| {
+        const matched = filter.highlightToken(str, filenameOrNull, token, case_sensitive, matches[index..]);
+        index += matched.len;
     }
-    return ranges[0..tokens.len];
+
+    return matches[0..index];
 }
 
 // Slices a string to be no longer than the specified width while considering graphemes and display width
@@ -116,9 +95,9 @@ inline fn drawCandidate(
     if (highlight) terminal.sgr(.reverse);
     defer terminal.sgr(.reset);
 
-    var ranges_buf: [16]Range = undefined;
+    var matches_buf: [2048]usize = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
-    const ranges = computeRanges(candidate.str, filename, &ranges_buf, tokens, case_sensitive);
+    const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, &matches_buf);
 
     const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
     const str = graphemeWidthSlice(candidate.str, @min(width - @as(usize, if (selected) 2 else 0), str_width));
@@ -127,11 +106,11 @@ inline fn drawCandidate(
         terminal.writeBytes("* ");
     }
 
-    // no highlights, just draw the string
-    if (ranges.len == 0 or terminal.no_color) {
-        _ = terminal.writer.write(str) catch unreachable;
+    // no highlights, just output the string
+    if (matches.len == 0 or terminal.no_color) {
+        _ = terminal.writeBytes(str);
     } else {
-        var slicer = Slicer.init(str, ranges);
+        var slicer = HighlightSlicer.init(str, matches);
         while (slicer.next()) |slice| {
             if (slice.highlight) {
                 terminal.sgr(terminal.highlight_color);
