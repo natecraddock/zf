@@ -312,6 +312,8 @@ pub fn highlightToken(
     case_sensitive: bool,
     matches: []usize,
 ) []const usize {
+    if (str.len == 0 or token.len == 0) return &.{};
+
     var best_rank: ?f64 = null;
 
     // Working memory for computing matches

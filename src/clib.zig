@@ -71,6 +71,18 @@ test "rank exported C library interface" {
     try testing.expect(rankToken("abcdefg", null, "A", true) == -1);
     try testing.expect(rankToken("a/path/to/file", "file", "file", false) != -1);
     try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == -1);
+
+    // zero length strings and tokens
+    {
+        const tokens: [1][*:0]const u8 = .{ "a" };
+        try testing.expect(rank("", &tokens, 1, false, false) == -1);
+    }
+    try testing.expect(rankToken("", null, "a", false) == -1);
+    {
+        const tokens: [1][*:0]const u8 = .{ "" };
+        try testing.expect(rank("a", &tokens, 1, false, false) == -1);
+    }
+    try testing.expect(rankToken("a", null, "", false) == -1);
 }
 
 export fn highlight(
@@ -155,4 +167,12 @@ test "highlight exported C library interface" {
     var small_buf: [4]usize = undefined;
     try testHighlight(&.{0, 1, 2, 3}, "abcd", &.{"ab", "cd", "abcd"}, false, false, &small_buf);
     try testHighlight(&.{0, 1, 2, 1}, "wxyz", &.{"wxy", "xyz"}, false, false, &small_buf);
+
+    // zero length strings and tokens
+    try testHighlight(&.{}, "", &.{ "a" }, false, false, &matches_buf);
+    len = highlightToken("", null, "a", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{}, matches_buf[0..len]);
+    try testHighlight(&.{}, "a", &.{ "" }, false, false, &matches_buf);
+    len = highlightToken("a", null, "", false, &matches_buf, matches_buf.len);
+    try testing.expectEqualSlices(usize, &.{}, matches_buf[0..len]);
 }
