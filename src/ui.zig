@@ -47,7 +47,7 @@ const HighlightSlicer = struct {
             if (start_state != highlight) break;
         }
 
-        const slice = Slice{ .str = slicer.str[slicer.index..index] , .highlight = slicer.highlight };
+        const slice = Slice{ .str = slicer.str[slicer.index..index], .highlight = slicer.highlight };
         slicer.highlight = !slicer.highlight;
         slicer.index = index;
         return slice;
@@ -477,7 +477,7 @@ fn lineUp(state: *State) void {
     }
 }
 
-fn lineDown(state: *State, visible_rows: usize, num_truncated :usize) void {
+fn lineDown(state: *State, visible_rows: usize, num_truncated: usize) void {
     if (state.selected < visible_rows - 1) {
         state.selected += 1;
     } else if (state.offset < num_truncated) {

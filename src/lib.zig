@@ -38,9 +38,9 @@ test "rank library interface" {
     try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == null);
 
     // zero length strings and tokens
-    try testing.expect(rank("", &.{ "a" }, false, false) == null);
+    try testing.expect(rank("", &.{"a"}, false, false) == null);
     try testing.expect(rankToken("", null, "a", false) == null);
-    try testing.expect(rank("a", &.{ "" }, false, false) == null);
+    try testing.expect(rank("a", &.{""}, false, false) == null);
     try testing.expect(rankToken("a", null, "", false) == null);
 }
 
@@ -98,12 +98,12 @@ test "highlight library interface" {
 
     // small buffer to ensure highlighting doesn't go out of range when the tokens overflow
     var small_buf: [4]usize = undefined;
-    try testing.expectEqualSlices(usize, &.{0, 1, 2, 3}, highlight("abcd", &.{"ab", "cd", "abcd"}, false, false, &small_buf));
-    try testing.expectEqualSlices(usize, &.{0, 1, 2, 1}, highlight("wxyz", &.{"wxy", "xyz"}, false, false, &small_buf));
+    try testing.expectEqualSlices(usize, &.{ 0, 1, 2, 3 }, highlight("abcd", &.{ "ab", "cd", "abcd" }, false, false, &small_buf));
+    try testing.expectEqualSlices(usize, &.{ 0, 1, 2, 1 }, highlight("wxyz", &.{ "wxy", "xyz" }, false, false, &small_buf));
 
     // zero length strings and tokens
-    try testing.expectEqualSlices(usize, &.{}, highlight("", &.{ "a" }, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{}, highlight("", &.{"a"}, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlightToken("", null, "a", false, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{}, highlight("a", &.{ "" }, false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{}, highlight("a", &.{""}, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlightToken("a", null, "", false, &matches_buf));
 }
