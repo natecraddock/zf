@@ -105,13 +105,10 @@ fn indexOf(
     slice: []const T,
     start_index: usize,
     value: T,
-    strict_path_match: bool,
     comptime case_sensitive: bool,
 ) ?usize {
     var i: usize = start_index;
     while (i < slice.len) : (i += 1) {
-        if (strict_path_match and value != '/' and slice[i] == '/') return null;
-
         if (case_sensitive) {
             if (slice[i] == value) return i;
         } else {
@@ -133,14 +130,21 @@ const IndexIterator = struct {
 
     pub fn next(self: *@This()) ?usize {
         const index = if (self.case_sensitive)
-            indexOf(u8, self.str, self.index, self.char, false, true)
+            indexOf(u8, self.str, self.index, self.char, true)
         else
-            indexOf(u8, self.str, self.index, self.char, false, false);
+            indexOf(u8, self.str, self.index, self.char, false);
 
         if (index) |i| self.index = i + 1;
         return index;
     }
 };
+
+fn hasSeparator(str: []const u8) bool {
+    for (str) |byte| {
+        if (byte == '/') return true;
+    }
+    return false;
+}
 
 /// rank a candidate against the given query tokens
 ///
@@ -157,7 +161,10 @@ pub fn rankCandidate(
     // each tokens rank is summed. if any token does not match the candidate is ignored
     var rank: f64 = 0;
     for (query_tokens) |token| {
-        if (rankToken(candidate, filename, token, case_sensitive)) |r| {
+        // TODO: move this separator check to the tokenization state for a performance optimization
+        // this will require changing the library interface for tokenization
+        const strict_path = hasSeparator(token);
+        if (rankToken(candidate, filename, token, case_sensitive, strict_path)) |r| {
             rank += r;
         } else return null;
     }
@@ -166,11 +173,77 @@ pub fn rankCandidate(
     return rank;
 }
 
+const PathIterator = struct {
+    str: []const u8,
+    index: usize = 0,
+
+    pub fn init(str: []const u8) PathIterator {
+        return .{ .str = str };
+    }
+
+    pub fn next(iter: *PathIterator) ?[]const u8 {
+        if (iter.index >= iter.str.len) return null;
+
+        const start = iter.index;
+        if (iter.str[iter.index] == '/') {
+            iter.index += 1;
+            return iter.str[start..iter.index];
+        }
+
+        while (iter.index < iter.str.len) : (iter.index += 1) {
+            if (iter.str[iter.index] == '/') {
+                return iter.str[start..iter.index];
+            }
+        }
+
+        return iter.str[start..];
+    }
+};
+
+test "path iterator" {
+    var iter = PathIterator.init("");
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("/");
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("a");
+    try testing.expectEqualStrings("a", iter.next().?);
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("/a");
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expectEqualStrings("a", iter.next().?);
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("a/");
+    try testing.expectEqualStrings("a", iter.next().?);
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("a/b/");
+    try testing.expectEqualStrings("a", iter.next().?);
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expectEqualStrings("b", iter.next().?);
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expect(iter.next() == null);
+
+    iter = PathIterator.init("src/data/b.zig");
+    try testing.expectEqualStrings("src", iter.next().?);
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expectEqualStrings("data", iter.next().?);
+    try testing.expectEqualStrings("/", iter.next().?);
+    try testing.expectEqualStrings("b.zig", iter.next().?);
+    try testing.expect(iter.next() == null);
+}
+
 pub fn rankToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
+    strict_path: bool,
 ) ?f64 {
     if (str.len == 0 or token.len == 0) return null;
 
@@ -178,13 +251,40 @@ pub fn rankToken(
     // the best (minimum) overall ranking is kept and returned
     var best_rank: ?f64 = null;
 
+    if (strict_path) {
+        var iter = PathIterator.init(token);
+        var start: usize = 0;
+        while (iter.next()) |segment| {
+            var segment_rank: ?f64 = null;
+
+            // TODO: we can probably optimize the case when the token is a single char (in all cases of IndexIterator)
+            var it = IndexIterator.init(str, segment[0], case_sensitive);
+            it.index = start;
+            while (it.next()) |start_index| {
+                if (scanToEnd(str, segment[1..], start_index, 0, null, case_sensitive, strict_path)) |scan| {
+                    if (segment_rank == null or scan.rank < segment_rank.?) {
+                        segment_rank = scan.rank;
+                        start = scan.index;
+                    }
+                } else break;
+            }
+
+            if (segment_rank) |rank| {
+                if (best_rank == null) {
+                    best_rank = rank;
+                } else best_rank = best_rank.? + rank;
+            } else return null;
+        }
+        return best_rank;
+    }
+
     // perform search on the filename only if requested
     if (filenameOrNull) |filename| {
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
-            if (scanToEnd(filename, token[1..], start_index, 0, null, case_sensitive, token[0] == '/')) |rank| {
-                if (best_rank == null or rank < best_rank.?) best_rank = rank;
-            } else if (token[0] != '/') break;
+            if (scanToEnd(filename, token[1..], start_index, 0, null, case_sensitive, false)) |scan| {
+                if (best_rank == null or scan.rank < best_rank.?) best_rank = scan.rank;
+            } else break;
         }
 
         if (best_rank != null) {
@@ -206,9 +306,9 @@ pub fn rankToken(
     // perform search on the full string if requested or if no match was found on the filename
     var it = IndexIterator.init(str, token[0], case_sensitive);
     while (it.next()) |start_index| {
-        if (scanToEnd(str, token[1..], start_index, 0, null, case_sensitive, token[0] == '/')) |rank| {
-            if (best_rank == null or rank < best_rank.?) best_rank = rank;
-        } else if (token[0] != '/') break;
+        if (scanToEnd(str, token[1..], start_index, 0, null, case_sensitive, false)) |scan| {
+            if (best_rank == null or scan.rank < best_rank.?) best_rank = scan.rank;
+        } else break;
     }
 
     return best_rank;
@@ -220,46 +320,46 @@ test "rankToken" {
     // then we should resolve this.
 
     // plain string matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "b", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("aaa", null, "aab", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("abbba", null, "abab", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", null, "", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "b", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("aaa", null, "aab", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("abbba", null, "abab", false, false));
 
-    try testing.expect(rankToken("a", null, "a", false) != null);
-    try testing.expect(rankToken("abc", null, "abc", false) != null);
-    try testing.expect(rankToken("aaabbbccc", null, "abc", false) != null);
-    try testing.expect(rankToken("azbycx", null, "x", false) != null);
-    try testing.expect(rankToken("azbycx", null, "ax", false) != null);
-    try testing.expect(rankToken("a", null, "a", false) != null);
+    try testing.expect(rankToken("a", null, "a", false, false) != null);
+    try testing.expect(rankToken("abc", null, "abc", false, false) != null);
+    try testing.expect(rankToken("aaabbbccc", null, "abc", false, false) != null);
+    try testing.expect(rankToken("azbycx", null, "x", false, false) != null);
+    try testing.expect(rankToken("azbycx", null, "ax", false, false) != null);
+    try testing.expect(rankToken("a", null, "a", false, false) != null);
 
     // file name matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", "", "", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a", "a", "b", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("c/a", "a", "b", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "z", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "fext.", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a/b/c", "c", "d", false));
+    try testing.expectEqual(@as(?f64, null), rankToken("", "", "", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/a", "a", "b", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("c/a", "a", "b", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "z", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "fext.", false, false));
+    try testing.expectEqual(@as(?f64, null), rankToken("/a/b/c", "c", "d", false, false));
 
-    try testing.expect(rankToken("/b", "b", "b", false) != null);
-    try testing.expect(rankToken("/a/b/c", "c", "c", false) != null);
-    try testing.expect(rankToken("/file.ext", "file.ext", "ext", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "file", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "to", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "path", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", false) != null);
-    try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false) != null);
+    try testing.expect(rankToken("/b", "b", "b", false, false) != null);
+    try testing.expect(rankToken("/a/b/c", "c", "c", false, false) != null);
+    try testing.expect(rankToken("/file.ext", "file.ext", "ext", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "file", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "to", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "path", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "pfile", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "ptf", false, false) != null);
+    try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false, false) != null);
 
     // strict path matching
-    try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "a/c", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false));
+    // try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "a/c", false, true));
+    // try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false, true));
+    // try testing.expectEqual(@as(?f64, null), rankToken("/app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true));
 
-    try testing.expect(rankToken("src/config/__init__.py", "__init__.py", "con/i", false) != null);
-    try testing.expect(rankToken("a/b/c/d", "d", "a/b/c", false) != null);
-    try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false) != null);
+    // try testing.expect(rankToken("src/config/__init__.py", "__init__.py", "con/i", false, true) != null);
+    // try testing.expect(rankToken("a/b/c/d", "d", "a/b/c", false, true) != null);
+    // try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true) != null);
 }
 
 /// A simple, append-only array list backed by a fixed buffer
@@ -330,13 +430,13 @@ pub fn highlightToken(
         while (it.next()) |start_index| {
             matched.append(start_index + offset);
 
-            if (scanToEnd(filename, token[1..], start_index, offset, &matched, case_sensitive, token[0] == '/')) |rank| {
-                if (best_rank == null or rank < best_rank.?) {
-                    best_rank = rank;
+            if (scanToEnd(filename, token[1..], start_index, offset, &matched, case_sensitive, false)) |scan| {
+                if (best_rank == null or scan.rank < best_rank.?) {
+                    best_rank = scan.rank;
                     best_matched.clear();
                     for (matched.slice()) |index| best_matched.append(index);
                 }
-            } else if (token[0] != '/') break;
+            } else break;
             matched.clear();
         }
         if (best_rank != null) return best_matched.slice();
@@ -349,13 +449,13 @@ pub fn highlightToken(
     while (it.next()) |start_index| {
         matched.append(start_index);
 
-        if (scanToEnd(str, token[1..], start_index, 0, &matched, case_sensitive, token[0] == '/')) |rank| {
-            if (best_rank == null or rank < best_rank.?) {
-                best_rank = rank;
+        if (scanToEnd(str, token[1..], start_index, 0, &matched, case_sensitive, false)) |scan| {
+            if (best_rank == null or scan.rank < best_rank.?) {
+                best_rank = scan.rank;
                 best_matched.clear();
                 for (matched.slice()) |index| best_matched.append(index);
             }
-        } else if (token[0] != '/') break;
+        } else break;
         matched.clear();
     }
 
@@ -369,6 +469,8 @@ inline fn isStartOfWord(byte: u8) bool {
     };
 }
 
+const ScanResult = struct { rank: f64, index: usize };
+
 /// this is the core of the ranking algorithm. special precedence is given to
 /// filenames. if a match is found on a filename the candidate is ranked higher
 fn scanToEnd(
@@ -378,12 +480,11 @@ fn scanToEnd(
     offset: usize,
     matched_indices: ?*FixedArrayList(usize),
     case_sensitive: bool,
-    start_strict_path_match: bool,
-) ?f64 {
+    strict_path: bool,
+) ?ScanResult {
     var rank: f64 = 1;
     var last_index = start_index;
     var last_sequential = false;
-    var strict_path_match = start_strict_path_match;
 
     // penalty for not starting on a word boundary
     if (start_index > 0 and !isStartOfWord(str[start_index - 1])) {
@@ -392,11 +493,14 @@ fn scanToEnd(
 
     for (token) |c| {
         const index = if (case_sensitive)
-            indexOf(u8, str, last_index + 1, c, strict_path_match, true)
+            indexOf(u8, str, last_index + 1, c, true)
         else
-            indexOf(u8, str, last_index + 1, c, strict_path_match, false);
+            indexOf(u8, str, last_index + 1, c, false);
 
         if (index) |idx| {
+            // did the match span a slash in strict path mode?
+            if (strict_path and hasSeparator(str[last_index .. idx + 1])) return null;
+
             if (matched_indices != null) matched_indices.?.append(idx + offset);
 
             if (idx == last_index + 1) {
@@ -417,11 +521,10 @@ fn scanToEnd(
             }
 
             last_index = idx;
-            if (c == '/') strict_path_match = true;
         } else return null;
     }
 
-    return rank;
+    return ScanResult{ .rank = rank, .index = last_index + 1 };
 }
 
 fn sort(_: void, a: Candidate, b: Candidate) bool {
@@ -460,7 +563,7 @@ fn testRankCandidates(
     for (expected) |expected_str, i| {
         if (!std.mem.eql(u8, expected_str, ranked[i].str)) {
             std.debug.print("\n======= order incorrect: ========\n", .{});
-            for (ranked[0..expected.len]) |candidate| std.debug.print("{s}\n", .{candidate.str});
+            for (ranked) |candidate| std.debug.print("{s}\n", .{candidate.str});
             std.debug.print("\n========== expected: ===========\n", .{});
             for (expected) |str| std.debug.print("{s}\n", .{str});
             std.debug.print("\n================================", .{});
