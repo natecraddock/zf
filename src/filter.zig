@@ -266,7 +266,7 @@ pub fn rankToken(
                         segment_rank = scan.rank;
                         start = scan.index;
                     }
-                } else break;
+                }
             }
 
             if (segment_rank) |rank| {
