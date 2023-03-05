@@ -139,7 +139,7 @@ const IndexIterator = struct {
     }
 };
 
-fn hasSeparator(str: []const u8) bool {
+pub fn hasSeparator(str: []const u8) bool {
     for (str) |byte| {
         if (byte == '/') return true;
     }
@@ -410,6 +410,7 @@ pub fn highlightToken(
     filenameOrNull: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
+    strict_path: bool,
     matches: []usize,
 ) []const usize {
     if (str.len == 0 or token.len == 0) return &.{};
@@ -417,9 +418,45 @@ pub fn highlightToken(
     var best_rank: ?f64 = null;
 
     // Working memory for computing matches
-    var buf: [512]usize = undefined;
-    var matched = FixedArrayList(usize).init(&buf);
+    var buf: [1024]usize = undefined;
+    var matched = FixedArrayList(usize).init(buf[0..512]);
+    var best_segment = FixedArrayList(usize).init(buf[512..]);
     var best_matched = FixedArrayList(usize).init(matches);
+
+    if (strict_path) {
+        var iter = PathIterator.init(token);
+        var start: usize = 0;
+        while (iter.next()) |segment| {
+            var segment_rank: ?f64 = null;
+
+            var it = IndexIterator.init(str, segment[0], case_sensitive);
+            it.index = start;
+            while (it.next()) |start_index| {
+                matched.append(start_index);
+
+                if (scanToEnd(str, segment[1..], start_index, 0, &matched, case_sensitive, strict_path)) |scan| {
+                    if (segment_rank == null or scan.rank < segment_rank.?) {
+                        segment_rank = scan.rank;
+                        start = scan.index;
+                        best_segment.clear();
+                        for (matched.slice()) |index| best_segment.append(index);
+                    }
+                }
+
+                matched.clear();
+            }
+
+            if (segment_rank) |rank| {
+                if (best_rank == null) {
+                    best_rank = rank;
+                } else best_rank = best_rank.? + rank;
+
+                for (best_segment.slice()) |index| best_matched.append(index);
+
+            } else return best_segment.slice();
+        }
+        return best_matched.slice();
+    }
 
     // highlight on the filename if requested
     if (filenameOrNull) |filename| {

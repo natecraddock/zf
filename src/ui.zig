@@ -63,7 +63,8 @@ fn calculateHighlights(
 ) []usize {
     var index: usize = 0;
     for (tokens) |token| {
-        const matched = filter.highlightToken(str, filenameOrNull, token, case_sensitive, matches[index..]);
+        const strict_path = filter.hasSeparator(token);
+        const matched = filter.highlightToken(str, filenameOrNull, token, case_sensitive, strict_path, matches[index..]);
         index += matched.len;
     }
 
