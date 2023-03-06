@@ -600,7 +600,7 @@ fn testRankCandidates(
     for (expected) |expected_str, i| {
         if (!std.mem.eql(u8, expected_str, ranked[i].str)) {
             std.debug.print("\n======= order incorrect: ========\n", .{});
-            for (ranked) |candidate| std.debug.print("{s}\n", .{candidate.str});
+            for (ranked[0..expected.len]) |candidate| std.debug.print("{s}\n", .{candidate.str});
             std.debug.print("\n========== expected: ===========\n", .{});
             for (expected) |str| std.debug.print("{s}\n", .{str});
             std.debug.print("\n================================", .{});
