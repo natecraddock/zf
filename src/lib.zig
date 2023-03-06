@@ -18,8 +18,9 @@ pub fn rankToken(
     filename: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
+    strict_path: bool,
 ) ?f64 {
-    return filter.rankToken(str, filename, token, case_sensitive);
+    return filter.rankToken(str, filename, token, case_sensitive, strict_path);
 }
 
 test "rank library interface" {
@@ -30,18 +31,18 @@ test "rank library interface" {
     try testing.expect(rank("a/path/to/file", &.{"zig"}, false, false) == null);
     try testing.expect(rank("a/path/to/file", &.{ "path", "file" }, false, false) != null);
 
-    try testing.expect(rankToken("abcdefg", null, "a", false) != null);
-    try testing.expect(rankToken("abcdefg", null, "z", false) == null);
-    try testing.expect(rankToken("abcdefG", null, "G", true) != null);
-    try testing.expect(rankToken("abcdefg", null, "A", true) == null);
-    try testing.expect(rankToken("a/path/to/file", "file", "file", false) != null);
-    try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == null);
+    try testing.expect(rankToken("abcdefg", null, "a", false, false) != null);
+    try testing.expect(rankToken("abcdefg", null, "z", false, false) == null);
+    try testing.expect(rankToken("abcdefG", null, "G", true, false) != null);
+    try testing.expect(rankToken("abcdefg", null, "A", true, false) == null);
+    try testing.expect(rankToken("a/path/to/file", "file", "file", false, false) != null);
+    try testing.expect(rankToken("a/path/to/file", "file", "zig", false, false) == null);
 
     // zero length strings and tokens
     try testing.expect(rank("", &.{"a"}, false, false) == null);
-    try testing.expect(rankToken("", null, "a", false) == null);
+    try testing.expect(rankToken("", null, "a", false, false) == null);
     try testing.expect(rank("a", &.{""}, false, false) == null);
-    try testing.expect(rankToken("a", null, "", false) == null);
+    try testing.expect(rankToken("a", null, "", false, false) == null);
 }
 
 /// compute matching ranges given a string and a slice of tokens
@@ -56,7 +57,8 @@ pub fn highlight(
 
     var index: usize = 0;
     for (tokens) |token| {
-        const matched = filter.highlightToken(str, filename, token, case_sensitive, matches[index..]);
+        const strict_path = filter.hasSeparator(token);
+        const matched = filter.highlightToken(str, filename, token, case_sensitive, strict_path, matches[index..]);
         index += matched.len;
     }
 
@@ -69,9 +71,10 @@ pub fn highlightToken(
     filename: ?[]const u8,
     token: []const u8,
     case_sensitive: bool,
+    strict_path: bool,
     matches: []usize,
 ) []const usize {
-    return filter.highlightToken(str, filename, token, case_sensitive, matches);
+    return filter.highlightToken(str, filename, token, case_sensitive, strict_path, matches);
 }
 
 test "highlight library interface" {
@@ -82,13 +85,13 @@ test "highlight library interface" {
     try testing.expectEqualSlices(usize, &.{ 2, 3, 4, 5, 10, 11, 12, 13 }, highlight("a/path/to/file", &.{ "path", "file" }, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{ 4, 5, 6, 7, 8, 9, 10 }, highlight("lib/ziglyph/zig.mod", &.{"ziglyph"}, false, false, &matches_buf));
 
-    try testing.expectEqualSlices(usize, &.{0}, highlightToken("abcdef", null, "a", false, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", null, "F", true, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, highlightToken("a/path/to/file", "file", "file", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{0}, highlightToken("abcdef", null, "a", false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", null, "F", true, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, highlightToken("a/path/to/file", "file", "file", false, false, &matches_buf));
 
     // highlights with basename trailing slashes
-    try testing.expectEqualSlices(usize, &.{0}, highlightToken("s/", "s", "s", false, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{ 20, 21, 22, 23 }, highlightToken("/this/is/path/not/a/file/", "file", "file", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{0}, highlightToken("s/", "s", "s", false, false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{ 20, 21, 22, 23 }, highlightToken("/this/is/path/not/a/file/", "file", "file", false, false, &matches_buf));
 
     // disconnected highlights
     try testing.expectEqualSlices(usize, &.{ 0, 2, 3 }, highlight("ababab", &.{"aab"}, false, false, &matches_buf));
@@ -103,7 +106,7 @@ test "highlight library interface" {
 
     // zero length strings and tokens
     try testing.expectEqualSlices(usize, &.{}, highlight("", &.{"a"}, false, false, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{}, highlightToken("", null, "a", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{}, highlightToken("", null, "a", false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlight("a", &.{""}, false, false, &matches_buf));
-    try testing.expectEqualSlices(usize, &.{}, highlightToken("a", null, "", false, &matches_buf));
+    try testing.expectEqualSlices(usize, &.{}, highlightToken("a", null, "", false, false, &matches_buf));
 }

@@ -17,7 +17,8 @@ export fn rank(
     var index: usize = 0;
     while (index < num_tokens) : (index += 1) {
         const token = std.mem.span(tokens[index]);
-        if (filter.rankToken(string, filename, token, case_sensitive)) |r| {
+        const strict_path = filter.hasSeparator(token);
+        if (filter.rankToken(string, filename, token, case_sensitive, strict_path)) |r| {
             total_rank += r;
         } else return -1.0;
     }
@@ -30,11 +31,12 @@ export fn rankToken(
     filename: ?[*:0]const u8,
     token: [*:0]const u8,
     case_sensitive: bool,
+    strict_path: bool,
 ) f64 {
     const string = std.mem.span(str);
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
-    if (filter.rankToken(string, name, tok, case_sensitive)) |r| {
+    if (filter.rankToken(string, name, tok, case_sensitive, strict_path)) |r| {
         return r;
     } else return -1.0;
 }
@@ -65,24 +67,24 @@ test "rank exported C library interface" {
         try testing.expect(rank("a/path/to/file", &tokens, 2, false, false) != -1);
     }
 
-    try testing.expect(rankToken("abcdefg", null, "a", false) != -1);
-    try testing.expect(rankToken("abcdefg", null, "z", false) == -1);
-    try testing.expect(rankToken("abcdefG", null, "G", true) != -1);
-    try testing.expect(rankToken("abcdefg", null, "A", true) == -1);
-    try testing.expect(rankToken("a/path/to/file", "file", "file", false) != -1);
-    try testing.expect(rankToken("a/path/to/file", "file", "zig", false) == -1);
+    try testing.expect(rankToken("abcdefg", null, "a", false, false) != -1);
+    try testing.expect(rankToken("abcdefg", null, "z", false, false) == -1);
+    try testing.expect(rankToken("abcdefG", null, "G", true, false) != -1);
+    try testing.expect(rankToken("abcdefg", null, "A", true, false) == -1);
+    try testing.expect(rankToken("a/path/to/file", "file", "file", false, false) != -1);
+    try testing.expect(rankToken("a/path/to/file", "file", "zig", false, false) == -1);
 
     // zero length strings and tokens
     {
         const tokens: [1][*:0]const u8 = .{"a"};
         try testing.expect(rank("", &tokens, 1, false, false) == -1);
     }
-    try testing.expect(rankToken("", null, "a", false) == -1);
+    try testing.expect(rankToken("", null, "a", false, false) == -1);
     {
         const tokens: [1][*:0]const u8 = .{""};
         try testing.expect(rank("a", &tokens, 1, false, false) == -1);
     }
-    try testing.expect(rankToken("a", null, "", false) == -1);
+    try testing.expect(rankToken("a", null, "", false, false) == -1);
 }
 
 export fn highlight(
@@ -102,7 +104,8 @@ export fn highlight(
     var token_index: usize = 0;
     while (token_index < tokens_len) : (token_index += 1) {
         const token = std.mem.span(tokens[token_index]);
-        const matched = filter.highlightToken(string, filename, token, case_sensitive, matches_slice[index..]);
+        const strict_path = filter.hasSeparator(token);
+        const matched = filter.highlightToken(string, filename, token, case_sensitive, strict_path, matches_slice[index..]);
         index += matched.len;
     }
 
@@ -114,6 +117,7 @@ export fn highlightToken(
     filename: ?[*:0]const u8,
     token: [*:0]const u8,
     case_sensitive: bool,
+    strict_path: bool,
     matches: [*]usize,
     matches_len: usize,
 ) usize {
@@ -121,7 +125,7 @@ export fn highlightToken(
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
     var matches_slice = matches[0..matches_len];
-    const matched = filter.highlightToken(string, name, tok, case_sensitive, matches_slice);
+    const matched = filter.highlightToken(string, name, tok, case_sensitive, strict_path, matches_slice);
     return matched.len;
 }
 
@@ -144,17 +148,17 @@ test "highlight exported C library interface" {
     try testHighlight(&.{ 0, 5 }, "abcdeF", &.{ "a", "F" }, true, false, &matches_buf);
     try testHighlight(&.{ 2, 3, 4, 5, 10, 11, 12, 13 }, "a/path/to/file", &.{ "path", "file" }, false, false, &matches_buf);
 
-    var len = highlightToken("abcdef", null, "a", false, &matches_buf, matches_buf.len);
+    var len = highlightToken("abcdef", null, "a", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{0}, matches_buf[0..len]);
-    len = highlightToken("abcdeF", null, "F", true, &matches_buf, matches_buf.len);
+    len = highlightToken("abcdeF", null, "F", true, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{5}, matches_buf[0..len]);
-    len = highlightToken("a/path/to/file", "file", "file", false, &matches_buf, matches_buf.len);
+    len = highlightToken("a/path/to/file", "file", "file", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, matches_buf[0..len]);
 
     // highlights with basename trailing slashes
-    len = highlightToken("s/", "s", "s", false, &matches_buf, matches_buf.len);
+    len = highlightToken("s/", "s", "s", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{0}, matches_buf[0..len]);
-    len = highlightToken("/this/is/path/not/a/file/", "file", "file", false, &matches_buf, matches_buf.len);
+    len = highlightToken("/this/is/path/not/a/file/", "file", "file", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{ 20, 21, 22, 23 }, matches_buf[0..len]);
 
     // disconnected highlights
@@ -170,9 +174,9 @@ test "highlight exported C library interface" {
 
     // zero length strings and tokens
     try testHighlight(&.{}, "", &.{"a"}, false, false, &matches_buf);
-    len = highlightToken("", null, "a", false, &matches_buf, matches_buf.len);
+    len = highlightToken("", null, "a", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{}, matches_buf[0..len]);
     try testHighlight(&.{}, "a", &.{""}, false, false, &matches_buf);
-    len = highlightToken("a", null, "", false, &matches_buf, matches_buf.len);
+    len = highlightToken("a", null, "", false, false, &matches_buf, matches_buf.len);
     try testing.expectEqualSlices(usize, &.{}, matches_buf[0..len]);
 }
