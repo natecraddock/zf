@@ -236,6 +236,29 @@ test "path iterator" {
     try testing.expect(iter.next() == null);
 }
 
+/// Scan left and right for the length of the current path segment
+pub fn segmentLen(str: []const u8, index: usize) usize {
+    if (str[index] == '/') return 1;
+
+    var start = index;
+    var end = index;
+    while (start > 0) : (start -= 1) {
+        if (str[start - 1] == '/') break;
+    }
+    while (end < str.len and str[end] != '/') : (end += 1) {}
+    return end - start;
+}
+
+test "segmentLen" {
+    try testing.expectEqual(@as(usize, 1), segmentLen("a", 0));
+    try testing.expectEqual(@as(usize, 1), segmentLen("/a", 1));
+    try testing.expectEqual(@as(usize, 1), segmentLen("/a/", 1));
+    try testing.expectEqual(@as(usize, 3), segmentLen("src/main.zig", 0));
+    try testing.expectEqual(@as(usize, 3), segmentLen("src/main.zig", 2));
+    try testing.expectEqual(@as(usize, 8), segmentLen("src/main.zig", 5));
+    try testing.expectEqual(@as(usize, 1), segmentLen("a/b", 1));
+}
+
 pub fn rankToken(
     str: []const u8,
     filenameOrNull: ?[]const u8,
@@ -253,23 +276,23 @@ pub fn rankToken(
         var iter = PathIterator.init(token);
         var start: usize = 0;
         while (iter.next()) |segment| {
-            var segment_rank: ?f64 = null;
-
             var it = IndexIterator.init(str, segment[0], case_sensitive);
             it.index = start;
             while (it.next()) |start_index| {
                 if (scanToEnd(str, segment[1..], start_index, 0, null, case_sensitive, strict_path)) |scan| {
-                    if (segment_rank == null or scan.rank < segment_rank.?) {
-                        segment_rank = scan.rank;
-                        start = scan.index;
-                    }
-                }
-            }
+                    // how much of the query token segment matched the path segment?
+                    // "mod" would match "module" better than "modules" for example
+                    const path_segment_len = segmentLen(str, start_index);
+                    const coverage = 1.0 - (@intToFloat(f64, segment.len) / @intToFloat(f64, path_segment_len));
+                    const rank = coverage * scan.rank;
 
-            if (segment_rank) |rank| {
-                if (best_rank == null) {
-                    best_rank = rank;
-                } else best_rank = best_rank.? + rank;
+                    if (best_rank == null) {
+                        best_rank = rank;
+                    } else best_rank = best_rank.? + rank;
+
+                    start = scan.index;
+                    break;
+                }
             } else return null;
         }
         return best_rank;
@@ -418,40 +441,36 @@ pub fn highlightToken(
 
     // Working memory for computing matches
     var buf: [1024]usize = undefined;
-    var matched = FixedArrayList(usize).init(buf[0..512]);
-    var best_segment = FixedArrayList(usize).init(buf[512..]);
+    var matched = FixedArrayList(usize).init(&buf);
     var best_matched = FixedArrayList(usize).init(matches);
 
     if (strict_path) {
         var iter = PathIterator.init(token);
         var start: usize = 0;
         while (iter.next()) |segment| {
-            var segment_rank: ?f64 = null;
-
             var it = IndexIterator.init(str, segment[0], case_sensitive);
             it.index = start;
             while (it.next()) |start_index| {
                 matched.append(start_index);
 
                 if (scanToEnd(str, segment[1..], start_index, 0, &matched, case_sensitive, strict_path)) |scan| {
-                    if (segment_rank == null or scan.rank < segment_rank.?) {
-                        segment_rank = scan.rank;
-                        start = scan.index;
-                        best_segment.clear();
-                        for (matched.slice()) |index| best_segment.append(index);
-                    }
-                }
+                    // how much of the query token segment matched the path segment?
+                    // "mod" would match "module" better than "modules" for example
+                    const path_segment_len = segmentLen(str, start_index);
+                    const coverage = 1.0 - (@intToFloat(f64, segment.len) / @intToFloat(f64, path_segment_len));
+                    const rank = coverage * scan.rank;
 
-                matched.clear();
-            }
+                    if (best_rank == null) {
+                        best_rank = rank;
+                    } else best_rank = best_rank.? + rank;
 
-            if (segment_rank) |rank| {
-                if (best_rank == null) {
-                    best_rank = rank;
-                } else best_rank = best_rank.? + rank;
+                    start = scan.index;
+                    for (matched.slice()) |index| best_matched.append(index);
+                    break;
+                } else matched.clear();
+            } else return &.{};
 
-                for (best_segment.slice()) |index| best_matched.append(index);
-            } else return best_segment.slice();
+            matched.clear();
         }
         return best_matched.slice();
     }
@@ -598,7 +617,7 @@ fn testRankCandidates(
     for (expected) |expected_str, i| {
         if (!std.mem.eql(u8, expected_str, ranked[i].str)) {
             std.debug.print("\n======= order incorrect: ========\n", .{});
-            for (ranked[0..expected.len]) |candidate| std.debug.print("{s}\n", .{candidate.str});
+            for (ranked[0..@min(ranked.len, expected.len)]) |candidate| std.debug.print("{s}\n", .{candidate.str});
             std.debug.print("\n========== expected: ===========\n", .{});
             for (expected) |str| std.debug.print("{s}\n", .{str});
             std.debug.print("\n================================", .{});
@@ -661,4 +680,15 @@ test "zf ranking consistency" {
     try testRankCandidates(&.{ "oat/sugar", "brown" }, &candidates, &.{"oatmeal/brown_sugar/brown.js"});
     try testRankCandidates(&.{"oat/sn"}, &candidates, &.{"oatmeal/sugar/snakes.txt"});
     try testRankCandidates(&.{"oat/skel"}, &candidates, &.{"oatmeal/sugar/skeletons.txt"});
+
+    // Strict path matching better ranking
+    try testRankCandidates(
+        &.{"mod/baz.rb"},
+        &.{
+            "./app/models/foo-bar-baz.rb",
+            "./app/models/foo/bar-baz.rb",
+            "./app/models/foo/bar/baz.rb",
+        },
+        &.{"./app/models/foo/bar/baz.rb"},
+    );
 }
