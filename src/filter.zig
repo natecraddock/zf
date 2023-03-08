@@ -161,8 +161,6 @@ pub fn rankCandidate(
     // each tokens rank is summed. if any token does not match the candidate is ignored
     var rank: f64 = 0;
     for (query_tokens) |token| {
-        // TODO: move this separator check to the tokenization state for a performance optimization
-        // this will require changing the library interface for tokenization
         const strict_path = hasSeparator(token);
         if (rankToken(candidate, filename, token, case_sensitive, strict_path)) |r| {
             rank += r;
@@ -257,7 +255,6 @@ pub fn rankToken(
         while (iter.next()) |segment| {
             var segment_rank: ?f64 = null;
 
-            // TODO: we can probably optimize the case when the token is a single char (in all cases of IndexIterator)
             var it = IndexIterator.init(str, segment[0], case_sensitive);
             it.index = start;
             while (it.next()) |start_index| {
@@ -315,10 +312,6 @@ pub fn rankToken(
 }
 
 test "rankToken" {
-    // TODO: cannot easily test smart case yet because the boolean here
-    // depends on the token being lower case. If rankToken is to be a public function
-    // then we should resolve this.
-
     // plain string matching
     try testing.expectEqual(@as(?f64, null), rankToken("", null, "", false, false));
     try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", false, false));
