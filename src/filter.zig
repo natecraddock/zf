@@ -353,13 +353,19 @@ test "rankToken" {
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false, false) != null);
 
     // strict path matching
-    // try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "a/c", false, true));
-    // try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false, true));
-    // try testing.expectEqual(@as(?f64, null), rankToken("/app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true));
+    try testing.expectEqual(@as(?f64, null), rankToken("a/b", "b", "ab", false, true));
+    try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "abc", false, true));
+    try testing.expectEqual(@as(?f64, null), rankToken("app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "mod/", false, true));
+    try testing.expectEqual(@as(?f64, null), rankToken("app/models/foo/bar/baz.rb", "baz.rb", "mod/barbaz", false, true));
+    try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false, true));
 
-    // try testing.expect(rankToken("src/config/__init__.py", "__init__.py", "con/i", false, true) != null);
-    // try testing.expect(rankToken("a/b/c/d", "d", "a/b/c", false, true) != null);
-    // try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true) != null);
+    try testing.expect(rankToken("a/b/c", "c", "a/c", false, true) != null);
+    try testing.expect(rankToken("a/b/c", "c", "//", false, true) != null);
+    try testing.expect(rankToken("src/config/__init__.py", "__init__.py", "con/i", false, true) != null);
+    try testing.expect(rankToken("a/b/c/d", "d", "a/b/c", false, true) != null);
+    try testing.expect(rankToken("./app/models/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true) != null);
+    try testing.expect(rankToken("/app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "a/m/f/b/baz", false, true) != null);
+    try testing.expect(rankToken("app/models/foo/bar/baz.rb", "baz.rb", "mod/baz.rb", false, true) != null);
 }
 
 /// A simple, append-only array list backed by a fixed buffer
@@ -452,7 +458,6 @@ pub fn highlightToken(
                 } else best_rank = best_rank.? + rank;
 
                 for (best_segment.slice()) |index| best_matched.append(index);
-
             } else return best_segment.slice();
         }
         return best_matched.slice();
@@ -637,4 +642,30 @@ test "zf ranking consistency" {
         },
         &.{"./tests/test_app.py"},
     );
+
+    // From issue #24, some really great test cases (thanks @ratfactor!)
+    const candidates = [_][]const u8{
+        "oat/meal/sug/ar",
+        "oat/meal/sug/ar/sugar",
+        "oat/meal/sug/ar/sugar.txt",
+        "oat/meal/sug/ar/sugar.js",
+        "oatmeal/sugar/sugar.txt",
+        "oatmeal/sugar/snakes.txt",
+        "oatmeal/sugar/skeletons.txt",
+        "oatmeal/brown_sugar.txt",
+        "oatmeal/brown_sugar/brown.js",
+        "oatmeal/brown_sugar/sugar.js",
+        "oatmeal/brown_sugar/brown_sugar.js",
+        "oatmeal/brown_sugar/sugar_brown.js",
+        "oatmeal/granulated_sugar.txt",
+        "oatmeal/raisins/sugar.js",
+    };
+    try testRankCandidates(
+        &.{ "oat/sugar", "sugar/sugar", "meal/sugar" },
+        &candidates,
+        &.{ "oatmeal/sugar/sugar.txt", "oatmeal/brown_sugar/sugar.js", "oatmeal/brown_sugar/brown_sugar.js" },
+    );
+    try testRankCandidates(&.{ "oat/sugar", "brown" }, &candidates, &.{"oatmeal/brown_sugar/brown.js"});
+    try testRankCandidates(&.{"oat/sn"}, &candidates, &.{"oatmeal/sugar/snakes.txt"});
+    try testRankCandidates(&.{"oat/skel"}, &candidates, &.{"oatmeal/sugar/skeletons.txt"});
 }
