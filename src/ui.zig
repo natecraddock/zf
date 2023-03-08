@@ -215,33 +215,27 @@ fn ctrl(comptime key: u8) u8 {
     return key & 0x1f;
 }
 
-// TODO: for some reason this needs to be extracted to a separate function,
-// perhaps related to ziglang/zig#137
-fn ctrlToAction(key: u8, vi_mode: bool) Action {
-    return switch (key) {
-        ctrl('c') => .close,
-        ctrl('w') => .delete_word,
-        ctrl('u') => .delete_line,
-        ctrl('h') => .backspace,
-        ctrl('a') => .cursor_leftmost,
-        ctrl('e') => .cursor_rightmost,
-        ctrl('d') => .delete,
-        ctrl('f') => .cursor_right,
-        ctrl('b') => .cursor_left,
-        ctrl('p') => .line_up,
-        ctrl('n'), ctrl('j') => .line_down,
-        ctrl('k') => if (vi_mode) Action{ .line_up = {} } else Action{ .delete_line_forward = {} },
-        else => .pass,
-    };
-}
-
 fn inputToAction(input: term.InputBuffer, vi_mode: bool) Action {
     return switch (input) {
         .str => |bytes| {
             if (bytes.len == 0) return .pass;
             return .{ .str = bytes };
         },
-        .control => |c| ctrlToAction(c, vi_mode),
+        .control => |c| switch (c) {
+            ctrl('c') => .close,
+            ctrl('w') => .delete_word,
+            ctrl('u') => .delete_line,
+            ctrl('h') => .backspace,
+            ctrl('a') => .cursor_leftmost,
+            ctrl('e') => .cursor_rightmost,
+            ctrl('d') => .delete,
+            ctrl('f') => .cursor_right,
+            ctrl('b') => .cursor_left,
+            ctrl('p') => .line_up,
+            ctrl('n'), ctrl('j') => .line_down,
+            ctrl('k') => if (vi_mode) .line_up else .delete_line_forward,
+            else => .pass,
+        },
         .backspace => .backspace,
         .delete => .delete,
         .up => .line_up,
