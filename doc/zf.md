@@ -22,7 +22,7 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 `-l, --lines`: Set the maximum number of result lines to show. Defaults to 10. Will be clamped to the number of candidates or the height of the terminal, whichever is greater. Set to a large number (like 1000) to display zf full screen.
 
-`-p, --plain`: Disable filename match prioritization. Useful when the input lines are not filenames.
+`-p, --plain`: Treat input as plaintext and disable filepath matching features. Useful when the input lines are not file paths.
 
 `-v, --version`: Show version information and exit
 

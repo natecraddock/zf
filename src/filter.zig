@@ -161,7 +161,7 @@ pub fn rankCandidate(
     // each tokens rank is summed. if any token does not match the candidate is ignored
     var rank: f64 = 0;
     for (query_tokens) |token| {
-        const strict_path = hasSeparator(token);
+        const strict_path = !plain and hasSeparator(token);
         if (rankToken(candidate, filename, token, case_sensitive, strict_path)) |r| {
             rank += r;
         } else return null;

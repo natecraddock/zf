@@ -59,11 +59,12 @@ fn calculateHighlights(
     filenameOrNull: ?[]const u8,
     tokens: [][]const u8,
     case_sensitive: bool,
+    plain: bool,
     matches: []usize,
 ) []usize {
     var index: usize = 0;
     for (tokens) |token| {
-        const strict_path = filter.hasSeparator(token);
+        const strict_path = !plain and filter.hasSeparator(token);
         const matched = filter.highlightToken(str, filenameOrNull, token, case_sensitive, strict_path, matches[index..]);
         index += matched.len;
     }
@@ -98,7 +99,7 @@ inline fn drawCandidate(
 
     var matches_buf: [2048]usize = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
-    const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, &matches_buf);
+    const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, plain, &matches_buf);
 
     const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
     const str = graphemeWidthSlice(candidate.str, @min(width - @as(usize, if (selected) 2 else 0), str_width));

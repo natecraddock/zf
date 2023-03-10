@@ -23,7 +23,7 @@ const help =
     \\-f, --filter     Skip interactive use and filter using the given query
     \\-k, --keep-order Don't sort by rank and preserve order of lines read on stdin
     \\-l, --lines      Set the maximum number of result lines to show (default 10)
-    \\-p, --plain      Disable filename match prioritization
+    \\-p, --plain      Treat input as plaintext and disable filepath matching features
     \\-v, --version    Show version information and exit
     \\-h, --help       Display this help and exit
 ;
