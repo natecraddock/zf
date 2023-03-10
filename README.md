@@ -34,7 +34,7 @@ Specifically,
 * Matches on filenames are prioritized over filepath matches
 * Matches on the beginning of a word are prioritized over matches in the middle of a word
 * Non-sequential character matches are penalized
-* Strict range matching for
+* Strict path matching for more precision
 
 Here are some concrete examples.
 
@@ -125,7 +125,7 @@ Zf targets the latest stable release of Zig.
 ```
 git clone --recursive https://github.com/natecraddock/zf
 cd zf
-zig build -Drelease-fast=true
+zig build -Drelease-safe=true
 ```
 
 The executable will be created in `./zig-out/bin/zf`.
