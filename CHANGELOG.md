@@ -1,7 +1,7 @@
 # master
 
 * **feat**: add multiselect support
-  ([e19409](https://github.com/natecraddock/zf/commit/b414ad))
+  ([e19409](https://github.com/natecraddock/zf/commit/e19409))
 
   Adds the ability to select and deselect candidates. Selection is toggled with <kbd>Tab</kbd>. The selected line is moved down with <kbd>Tab</kbd>, and moved up with <kbd>Shift Tab</kbd>. If any lines are selected, the number selected is displayed in the top
   right of the UI.
@@ -9,9 +9,33 @@
   Lines are written to stdout separated by newlines. This may be configurable in the future.
 
 * **feat**: allow scrolling the list of candidates
-  ([4ea08e](https://github.com/natecraddock/zf/commit/b414ad))
+  ([4ea08e](https://github.com/natecraddock/zf/commit/4ea08e))
 
   When the list of candidates is larger than the terminal height or configured display lines (default 10), moving the selected line past the bottom will now scroll the list. This means any item can be selected with the arrow keys alone.
+
+* **feat**: improved strict path matching
+  ([18e6c2](https://github.com/natecraddock/zf/commit/18e6c2))
+  ([734af1](https://github.com/natecraddock/zf/commit/734af1))
+
+  This feature was completely rewritten. Strict path matching is now slightly less strict and does not require contiguous path segments to match. This makes it much more useful in practice. The ranking of path segments has also been improved to more accurately find the closest match.
+
+* **feat**: improve highlighting to match byte-by-byte
+  ([3b9bf9](https://github.com/natecraddock/zf/commit/3b9bf9))
+
+  This makes the highlights more precise and also fixes a subtle bug in the previous highlighting logic
+
+* **feat**: simplify the module API
+  ([0e81f7](https://github.com/natecraddock/zf/commit/0e81f7))
+
+  Removes the filename parameter from the module and C APIs and adds a `plain` boolean parameter. This makes the higher-level API simpler to use.
+
+* **fix**: index out of bounds in library
+  ([712ee2](https://github.com/natecraddock/zf/commit/712ee2))
+
+  Previously the library wouldn't properly handle zero-length strings or tokens and would read out of bounds.
+
+* **fix**: `--plain` and `-p` now properly disable strict path matching
+  ([c346c1](https://github.com/natecraddock/zf/commit/c346c1))
 
 # 0.7.0
 
