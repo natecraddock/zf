@@ -3,6 +3,8 @@ const testing = std.testing;
 
 const ArrayList = std.ArrayList;
 
+const sep = std.fs.path.sep;
+
 /// Candidates are the strings read from stdin
 pub const Candidate = struct {
     str: []const u8,
@@ -141,7 +143,7 @@ const IndexIterator = struct {
 
 pub fn hasSeparator(str: []const u8) bool {
     for (str) |byte| {
-        if (byte == '/') return true;
+        if (byte == sep) return true;
     }
     return false;
 }
@@ -183,13 +185,13 @@ const PathIterator = struct {
         if (iter.index >= iter.str.len) return null;
 
         const start = iter.index;
-        if (iter.str[iter.index] == '/') {
+        if (iter.str[iter.index] == sep) {
             iter.index += 1;
             return iter.str[start..iter.index];
         }
 
         while (iter.index < iter.str.len) : (iter.index += 1) {
-            if (iter.str[iter.index] == '/') {
+            if (iter.str[iter.index] == sep) {
                 return iter.str[start..iter.index];
             }
         }
@@ -238,14 +240,14 @@ test "path iterator" {
 
 /// Scan left and right for the length of the current path segment
 pub fn segmentLen(str: []const u8, index: usize) usize {
-    if (str[index] == '/') return 1;
+    if (str[index] == sep) return 1;
 
     var start = index;
     var end = index;
     while (start > 0) : (start -= 1) {
-        if (str[start - 1] == '/') break;
+        if (str[start - 1] == sep) break;
     }
-    while (end < str.len and str[end] != '/') : (end += 1) {}
+    while (end < str.len and str[end] != sep) : (end += 1) {}
     return end - start;
 }
 
@@ -478,7 +480,7 @@ pub fn highlightToken(
     // highlight on the filename if requested
     if (filenameOrNull) |filename| {
         // The basename doesn't include trailing slashes so if the string ends in a slash the offset will be off by one
-        const offset = str.len - filename.len - @as(usize, if (str[str.len - 1] == '/') 1 else 0);
+        const offset = str.len - filename.len - @as(usize, if (str[str.len - 1] == sep) 1 else 0);
 
         var it = IndexIterator.init(filename, token[0], case_sensitive);
         while (it.next()) |start_index| {
@@ -518,7 +520,7 @@ pub fn highlightToken(
 
 inline fn isStartOfWord(byte: u8) bool {
     return switch (byte) {
-        std.fs.path.sep, '_', '-', '.', ' ' => true,
+        sep, '_', '-', '.', ' ' => true,
         else => false,
     };
 }

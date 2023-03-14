@@ -2,6 +2,7 @@ const dw = ziglyph.display_width;
 const filter = @import("filter.zig");
 const std = @import("std");
 const system = std.os.system;
+const term = @import("term.zig");
 const testing = std.testing;
 const ziglyph = @import("ziglyph");
 
@@ -12,7 +13,7 @@ const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
 const Terminal = term.Terminal;
 
-const term = @import("term.zig");
+const sep = std.fs.path.sep;
 
 const State = struct {
     selected: usize,
@@ -447,7 +448,7 @@ fn deleteWord(query: *EditBuffer) void {
 
     // ignore trailing spaces or slashes
     const trailing = slice[end];
-    if (trailing == ' ' or trailing == '/') {
+    if (trailing == ' ' or trailing == sep) {
         while (end > 1 and slice[end] == trailing) {
             end -= 1;
         }
@@ -457,7 +458,7 @@ fn deleteWord(query: *EditBuffer) void {
     // find last most space or slash
     var last_index: ?usize = null;
     for (slice) |byte, i| {
-        if (byte == ' ' or byte == '/') last_index = i;
+        if (byte == ' ' or byte == sep) last_index = i;
     }
 
     if (last_index) |index| {
