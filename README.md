@@ -4,7 +4,7 @@
 
 zf is an interactive commandline fuzzy finder that prioritizes matches on filenames. zf accepts newline separated strings on `stdin` and outputs the selected line on `stdout`. Use with a pipe, or io redirection. See the [documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details. zf is also packaged as an allocation-free library for fuzzy filtering.
 
-![zf](https://user-images.githubusercontent.com/7967463/155037380-79f61539-7d20-471b-8040-6ee7d0e4b6ea.gif)
+https://user-images.githubusercontent.com/7967463/225198950-a6ab568f-644f-40a1-b202-c12a35aeaed8.mp4
 
 ## Features
 
@@ -77,8 +77,7 @@ efficient.
 
 ### Strict path matching
 
-This feature is a "do what I mean" feature, more easily shown than explained. When the query looks like a path (contains at least one path separator) strict path matching is enabled.
-
+This feature is a "do what I mean" feature, more easily used than explained. When the query looks like a path (contains at least one path separator) strict path matching is enabled.
 
 Path segments are the portions of a path delimited by path separators. `foo/bar` has segments `foo` and `bar`. With strict path matching the path segments of the query token must not span across path segments in the candidate. As an example, the query `foo/` would match `foo/bar/` but not `fo/obar/` because the characters `"foo"` must appear in a single path segment.
 
