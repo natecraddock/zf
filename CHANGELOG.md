@@ -39,6 +39,9 @@
 * **fix**: `--plain` and `-p` now properly disable strict path matching
   ([c346c1](https://github.com/natecraddock/zf/commit/c346c1))
 
+* **fix**: use os-specific path separators
+  ([db69f6](https://github.com/natecraddock/zf/db69f6))
+
 # 0.7.0
 
 The headline feature of this release is strict path matching, another way that zf is optimized for filtering filepaths with accuracy and precision.
@@ -66,7 +69,7 @@ This release also includes many fixes, refactors, optimizations, unicode support
   ([d596cc](https://github.com/natecraddock/zf/commit/d596cc))
   ([b397fa](https://github.com/natecraddock/zf/commit/b397fa))
 
-  Zf now normalizes all input (both the lines read on `stdin` and the query text) to unicode NFD form. This improves matching accuracy. The query editing line also now fully supports unicode grapheme cluster editing.
+  zf now normalizes all input (both the lines read on `stdin` and the query text) to unicode NFD form. This improves matching accuracy. The query editing line also now fully supports unicode grapheme cluster editing.
 
 * **feat**: add `ZF_HIGHLIGHT` environment variable to set highlight color
   ([3cf713](https://github.com/natecraddock/zf/commit/3cf713))
@@ -76,7 +79,7 @@ This release also includes many fixes, refactors, optimizations, unicode support
 * **perf**: preallocate filtered candidate buffers
   ([c2a36ba](https://github.com/natecraddock/zf/commit/c2a36ba))
 
-  Because zf uses an arena allocator and does not deallocate, this prevents unnecessary allocations. Zf no longer has memory use increase over the runtime of the program. This also slightly improves performance by reducing time spent allocating.
+  Because zf uses an arena allocator and does not deallocate, this prevents unnecessary allocations. zf no longer has memory use increase over the runtime of the program. This also slightly improves performance by reducing time spent allocating.
 
 * **tests**: add initial zf ranking consistency tests
   ([fbfb8f](https://github.com/natecraddock/zf/commit/fbfb8f))
@@ -105,7 +108,7 @@ While refactoring zf to be more easily consumed by a library, I designed the lib
 
   Adds a Zig package exposing the zf ranking and highlight functions. Also updates the existing C library to match the Zig library.
 
-  See the [docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for instructions on using Zf as a library.
+  See the [docs](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for instructions on using zf as a library.
 
 * **refactor**: reduce size of the Candidate struct and reorganize code
   ([ee2d18](https://github.com/natecraddock/zf/commit/ee2d18))

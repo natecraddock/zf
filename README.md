@@ -2,20 +2,19 @@
 
 [![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml) [![Packaging status](https://repology.org/badge/tiny-repos/zf.svg)](https://repology.org/project/zf/versions)
 
-Zf is an interactive commandline fuzzy finder that prioritizes matches on filenames. Zf accepts newline separated strings on `stdin` and outputs the selected line on `stdout`. Use with a pipe, or io redirection. See the [documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details. Zf is also packaged as an allocation-free library for fuzzy filtering.
+zf is an interactive commandline fuzzy finder that prioritizes matches on filenames. zf accepts newline separated strings on `stdin` and outputs the selected line on `stdout`. Use with a pipe, or io redirection. See the [documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details. zf is also packaged as an allocation-free library for fuzzy filtering.
 
 ![zf](https://user-images.githubusercontent.com/7967463/155037380-79f61539-7d20-471b-8040-6ee7d0e4b6ea.gif)
 
 ## Features
 
-* ranking algorithm designed for fuzzy matching file paths
-* also functions as a general purpose fuzzy finder for arbitrary strings
+* designed for fuzzy matching file paths (but also works as a general purpose fuzzy finder)
 * refine search results with whitespace separated query terms
 * case insensitive unless the query contains uppercase letters (smartcase)
 * multiselect to output multiple selected lines
 * Zig and C libraries for the zf ranking algorithm
 
-Zf aims to be simple:
+zf aims to be simple:
 * no full-window interface
 * minimal config and options
 * sensible defaults
@@ -25,16 +24,16 @@ Zf aims to be simple:
 * [Usage Documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md)
 * [Library Documentation](https://github.com/natecraddock/zf/blob/master/doc/lib.md)
 
-## Why use zf over fzf, fzy, selecta, pick, etc?
+## Why use zf?
 
-Zf was designed knowing that a frequent use case for fuzzy finders is filtering filepaths. It also works great for any arbitrary string, but it is especially good at filtering filepaths with precision.
+zf was designed knowing that a frequent use case for fuzzy finders is filtering filepaths. It also works great for any arbitrary string, but it is especially good at filtering filepaths with precision.
 
 Specifically,
 
 * Matches on filenames are prioritized over filepath matches
 * Matches on the beginning of a word are prioritized over matches in the middle of a word
 * Non-sequential character matches are penalized
-* Strict path matching for more precision
+* Strict path matching offers even more precision
 
 Here are some concrete examples.
 
@@ -78,7 +77,10 @@ efficient.
 
 ### Strict path matching
 
-One additional feature included in zf is strict path matching. With strict path matching, when a query token contains a `/` character, any other characters after the slash must appear in a single path segment. As an example, the query `/foo` would match `/foo/bar/` but not `/fo/obar` because the characters `"foo"` must appear in a single path segment.
+This feature is a "do what I mean" feature, more easily shown than explained. When the query looks like a path (contains at least one path separator) strict path matching is enabled.
+
+
+Path segments are the portions of a path delimited by path separators. `foo/bar` has segments `foo` and `bar`. With strict path matching the path segments of the query token must not span across path segments in the candidate. As an example, the query `foo/` would match `foo/bar/` but not `fo/obar/` because the characters `"foo"` must appear in a single path segment.
 
 This is useful for narrowing down results when you know the exact path structure of your files. With the following paths
 
@@ -120,7 +122,7 @@ Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries 
 
 ### Building from source
 
-Zf targets the latest stable release of Zig.
+zf targets the latest stable release of Zig.
 
 ```
 git clone --recursive https://github.com/natecraddock/zf

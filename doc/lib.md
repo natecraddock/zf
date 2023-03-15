@@ -1,6 +1,6 @@
 # Using zf as a library
 
-Zf is offered as both a Zig package and a C library. The library is allocation free and expects the caller to handle any required allocations.
+zf is offered as both a Zig package and a C library. The library is allocation free and expects the caller to handle any required allocations.
 
 ## Usage details
 There are a few things that zf expects you to follow when using it as a library. Pay special attention to the `case_sensitive` parameter.
@@ -11,7 +11,7 @@ The Zig and C APIs are nearly identical. The Zig API takes advantage of Zig's ab
 The library offers both high and low level interfaces to zf's ranking algorithm. The high level interfaces (`rank()` and `highlight()`) rank a string against a list of query tokens. The low level functions (`rankToken()` and `highlightToken()`) require more work on the caller's part, but are more flexible.
 
 ### Case sensitivity
-`case_sensitive` is an argument in all library ranking functions. When `case_sensitive` is false, the tokens **will not be converted to lowercase**. This is for efficiency reasons. Zf assumes the caller knows when case sensitivity will be enabled, and expects the caller to ensure any tokens are fully lowercase when `case_sensitive` is false. When `case_sensitive` is true, nothing needs to be done.
+`case_sensitive` is an argument in all library ranking functions. When `case_sensitive` is false, the tokens **will not be converted to lowercase**. This is for efficiency reasons. zf assumes the caller knows when case sensitivity will be enabled, and expects the caller to ensure any tokens are fully lowercase when `case_sensitive` is false. When `case_sensitive` is true, nothing needs to be done.
 
 More concretely, calling `rankToken("my/Path/here", "Path", false, false)` (case sensitive is false) will NOT match. The string `"my/Path/here"` will be converted to lowercase, but the token will remain as `"Path"`.
 
