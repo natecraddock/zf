@@ -14,7 +14,7 @@ const filter = @import("filter.zig");
 const term = @import("term.zig");
 const ui = @import("ui.zig");
 
-const version = "0.8.0";
+const version = "0.9.0-dev";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =
