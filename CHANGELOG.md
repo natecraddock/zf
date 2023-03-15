@@ -1,5 +1,7 @@
 # master
 
+# 0.8.0
+
 * **feat**: add multiselect support
   ([e19409](https://github.com/natecraddock/zf/commit/e19409))
 
