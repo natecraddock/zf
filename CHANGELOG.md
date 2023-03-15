@@ -2,6 +2,8 @@
 
 # 0.8.0
 
+This release adds multiselect to the UI, improves the strict path matching feature added in the previous release, and improves the highlighting logic to be more accurate. The library API has also been updated.
+
 * **feat**: add multiselect support
   ([e19409](https://github.com/natecraddock/zf/commit/e19409))
 
