@@ -1,5 +1,10 @@
 # master
 
+* **feat**: Add `-d` and `--delimiter` options to set custom delimiters
+  ([2f84ce](https://github.com/natecraddock/zf/commit/2f84ce))
+
+  Adds a new option to set a custom delimiter. Defaults to `\n`. If the delimiter is `\n` or `\0` it will be escaped. Currently delimiters are only single bytes, so only the first byte of the delimiter will be used.
+
 # 0.8.0
 
 This release adds multiselect to the UI, improves the strict path matching feature added in the previous release, and improves the highlighting logic to be more accurate. The library API has also been updated.
