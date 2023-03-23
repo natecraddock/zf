@@ -1,5 +1,6 @@
 complete -c zf -f
 
+complete -f -c zf -s d -l delimiter -d "Set the delimiter used to split candidates (default \n)"
 complete -f -c zf -s f -l filter -d "Skip interactive use and filter using the given query"
 complete -f -c zf -s k -l keep-order -d "Don't sort by rank and preserve order of lines read on stdin"
 complete -x -c zf -s l -l lines -d "Set the maximum number of result lines to show (default 10)"

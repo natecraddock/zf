@@ -8,10 +8,11 @@ _zf() {
     args+=(
         "(- *)"{-v,--version}"[Show version information and exit]"
         "(- *)"{-h,--help}"[Display this help and exit]"
+        "(-d --delimiter)"{-d,--delimiter}"Set the delimiter used to split candidates (default \n):string:"
         "(-f --filter)"{-f,--filter}"[Skip interactive use and filter using the given query]:string:"
         "(-k --keep-order)"{-k,--keep-order}"[Don't sort by rank and preserve order of lines read on stdin]"
         "(-l --lines)"{-l,--lines}"[Set the maximum number of result lines to show (default 10)]:int:"
-        "(-p --plain)"{-l,--lines}"[Treat input as plaintext and disable filepath matching features]"
+        "(-p --plain)"{-p,--plain}"[Treat input as plaintext and disable filepath matching features]"
     )
     _arguments $args[@]
 }
