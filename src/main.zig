@@ -20,6 +20,7 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 const help =
     \\Usage: zf [options]
     \\
+    \\-d, --delimiter  Set the delimiter used to split candidates (default \n)
     \\-f, --filter     Skip interactive use and filter using the given query
     \\-k, --keep-order Don't sort by rank and preserve order of lines read on stdin
     \\-l, --lines      Set the maximum number of result lines to show (default 10)
@@ -36,6 +37,7 @@ const Config = struct {
     lines: usize = 10,
     plain: bool = false,
     query: []u8 = undefined,
+    delimiter: []const u8 = "\n",
 
     // HACK: error unions cannot return a value, so return error messages in
     // the config struct instead
@@ -95,6 +97,29 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
 
             config.query = try allocator.alloc(u8, args[index + 1].len);
             std.mem.copy(u8, config.query, args[index + 1]);
+            skip = true;
+        } else if (eql(u8, arg, "-d") or eql(u8, arg, "--delimiter")) {
+            if (index + 1 > args.len - 1) {
+                config.err = true;
+                config.err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "zf: option '{s}' requires an argument\n{s}",
+                    .{ arg, help },
+                );
+                return config;
+            }
+
+            config.delimiter = args[index + 1];
+            if (config.delimiter.len == 0) {
+                config.err = true;
+                config.err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "zf: delimiter cannot be empty\n{s}",
+                    .{ help },
+                );
+                return config;
+            }
+
             skip = true;
         } else {
             config.err = true;
@@ -224,10 +249,20 @@ pub fn main() anyerror!void {
     const buf = blk: {
         var stdin = io.getStdIn().reader();
         const buf = try readAll(allocator, &stdin);
-        break :blk (try normalizer.nfd(allocator, buf)).slice;
+        break :blk std.mem.trim(u8, (try normalizer.nfd(allocator, buf)).slice, "\n");
     };
 
-    const delimiter = '\n';
+    // escape specific delimiters
+    const delimiter = blk: {
+        if (eql(u8, config.delimiter, "\\n")) {
+            break :blk '\n';
+        } else if (eql(u8, config.delimiter, "\\0")) {
+            break :blk 0;
+        } else {
+            break :blk config.delimiter[0];
+        }
+    };
+
     var candidates = try filter.collectCandidates(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 

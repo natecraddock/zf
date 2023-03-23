@@ -28,7 +28,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
     }
 
     // catch the end if stdio didn't end in a delimiter
-    if (start < buf.len) {
+    if (start < buf.len and buf[start] != delimiter) {
         try candidates.append(buf[start..]);
     }
 
