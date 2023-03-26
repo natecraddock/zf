@@ -115,6 +115,12 @@ Install with Homebrew
 brew install zf
 ```
 
+### Nix
+
+```
+nix-env --install zf
+```
+
 ### Binaries
 
 Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries attached for macOS and Linux.
