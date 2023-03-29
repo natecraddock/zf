@@ -50,7 +50,7 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
     var config: Config = .{};
 
     var skip = false;
-    for (args[1..]) |arg, i| {
+    for (args[1..], 0..) |arg, i| {
         if (skip) {
             skip = false;
             continue;
@@ -115,7 +115,7 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
                 config.err_str = try std.fmt.allocPrint(
                     allocator,
                     "zf: delimiter cannot be empty\n{s}",
-                    .{ help },
+                    .{help},
                 );
                 return config;
             }

@@ -17,7 +17,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 
     // find delimiters
     var start: usize = 0;
-    for (buf) |char, index| {
+    for (buf, 0..) |char, index| {
         if (char == delimiter) {
             // add to arraylist only if slice is not all delimiters
             if (index - start != 0) {
@@ -81,7 +81,7 @@ pub fn rankCandidates(
     case_sensitive: bool,
 ) []Candidate {
     if (tokens.len == 0) {
-        for (candidates) |candidate, index| {
+        for (candidates, 0..) |candidate, index| {
             ranked[index] = .{ .str = candidate };
         }
         return ranked;
@@ -593,7 +593,7 @@ fn sort(_: void, a: Candidate, b: Candidate) bool {
     if (a.str.len > b.str.len) return false;
 
     // then alphabetically
-    for (a.str) |c, i| {
+    for (a.str, 0..) |c, i| {
         if (c < b.str[i]) return true;
         if (c > b.str[i]) return false;
     }
@@ -616,7 +616,7 @@ fn testRankCandidates(
     defer testing.allocator.free(ranked_buf);
     const ranked = rankCandidates(ranked_buf, candidates, tokens, false, false, false);
 
-    for (expected) |expected_str, i| {
+    for (expected, 0..) |expected_str, i| {
         if (!std.mem.eql(u8, expected_str, ranked[i].str)) {
             std.debug.print("\n======= order incorrect: ========\n", .{});
             for (ranked[0..@min(ranked.len, expected.len)]) |candidate| std.debug.print("{s}\n", .{candidate.str});
