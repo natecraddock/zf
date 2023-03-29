@@ -132,7 +132,7 @@ For compatibility with system package managers, zf targets the latest stable rel
 ```
 git clone --recursive https://github.com/natecraddock/zf
 cd zf
-zig build -Drelease-safe=true
+zig build -Doptimize=ReleaseSafe -fsummary
 ```
 
 The executable will be created in `./zig-out/bin/zf`.
