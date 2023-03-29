@@ -351,7 +351,7 @@ pub fn run(
         for (candidates) |candidate| {
             filtered.appendAssumeCapacity(.{ .str = candidate });
         }
-        break :blk filtered.toOwnedSlice();
+        break :blk try filtered.toOwnedSlice();
     };
 
     var tokens_buf = try allocator.alloc([]const u8, 16);
@@ -422,7 +422,7 @@ pub fn run(
                 if (filtered.len == 0) break;
                 if (selected_rows.slice().len > 0) {
                     var selected_buf = try allocator.alloc([]const u8, selected_rows.slice().len);
-                    for (selected_rows.slice()) |index, i| {
+                    for (selected_rows.slice(), 0..) |index, i| {
                         selected_buf[i] = filtered[index].str;
                     }
                     return selected_buf;
@@ -457,7 +457,7 @@ fn deleteWord(query: *EditBuffer) void {
 
     // find last most space or slash
     var last_index: ?usize = null;
-    for (slice) |byte, i| {
+    for (slice, 0..) |byte, i| {
         if (byte == ' ' or byte == sep) last_index = i;
     }
 

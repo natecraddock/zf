@@ -28,7 +28,7 @@ pub fn ArrayToggleSet(comptime T: type) type {
         }
 
         pub fn toggle(as: *This, item: T) !void {
-            for (as.set.items) |i, index| {
+            for (as.set.items, 0..) |i, index| {
                 if (item == i) {
                     _ = as.set.orderedRemove(index);
                     return;
