@@ -13,6 +13,11 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Expose zf as a Zig module
+    _ = b.addModule("zf", .{
+        .source_file = .{ .path = "src/lib.zig" },
+    });
+
     const ziglyph = b.dependency("ziglyph", .{
         .target = target,
         .optimize = optimize,
