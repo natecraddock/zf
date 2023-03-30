@@ -127,7 +127,7 @@ Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries 
 
 ### Building from source
 
-zf targets the latest stable release of Zig.
+This branch is kept in sync with the Zig master branch.
 
 ```
 git clone --recursive https://github.com/natecraddock/zf
