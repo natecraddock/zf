@@ -1,0 +1,11 @@
+.{
+    .name = "zf",
+    .description = "a commandline fuzzy finder designed for filtering filepaths",
+    .version = "0.9.0",
+    .dependencies = .{
+        .ziglyph = .{
+            .url = "https://github.com/jecolon/ziglyph/archive/a737cf1808f35f7cb5eb54a9b0bc47d839bae506.tar.gz",
+            .hash = "1220c892b709f43fac99c3ea7876fd0333274c8bec5fee62f7a341b523687e85d722",
+        }
+    },
+}
