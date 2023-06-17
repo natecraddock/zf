@@ -30,9 +30,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.addModule("ziglyph", ziglyph.module("ziglyph"));
-    exe.install();
+    b.installArtifact(exe);
 
-    const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_cmd.addArgs(args);
 
@@ -46,6 +46,7 @@ pub fn build(b: *std.Build) void {
     });
     tests.addModule("ziglyph", ziglyph.module("ziglyph"));
 
+    const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&tests.run().step);
+    test_step.dependOn(&run_tests.step);
 }

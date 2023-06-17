@@ -96,7 +96,7 @@ pub fn rankCandidates(
     }
 
     if (!keep_order) {
-        std.sort.sort(Candidate, ranked[0..index], {}, sort);
+        std.sort.block(Candidate, ranked[0..index], {}, sort);
     }
 
     return ranked[0..index];
