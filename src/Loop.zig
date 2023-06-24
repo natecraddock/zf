@@ -3,10 +3,13 @@
 //! Because pselect is difficult to call from Zig, a portion of the code is written in C.
 //! See loop.c for more details.
 
+const builtin = @import("builtin");
 const os = std.os;
 const std = @import("std");
 
 const Loop = @This();
+
+const SIG_BLOCK = if (builtin.os.tag == .macos) os.SIG._BLOCK else os.SIG.BLOCK;
 
 /// The file descriptor of the TTY
 ttyfd: os.fd_t,
@@ -20,7 +23,7 @@ pub fn init(ttyfd: os.fd_t) !Loop {
     // This will be unblocked by the kernel within the pselect() call.
     var sigset = os.system.empty_sigset;
     os.system.sigaddset(&sigset, os.SIG.WINCH);
-    _ = os.system.sigprocmask(os.SIG._BLOCK, &sigset, null);
+    _ = os.system.sigprocmask(SIG_BLOCK, &sigset, null);
 
     // Setup SIGWINCH signal handler
     var sigaction: os.Sigaction = .{
