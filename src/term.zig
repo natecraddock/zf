@@ -155,7 +155,7 @@ pub const Terminal = struct {
     }
 
     pub fn sgr(self: *Terminal, code: SGRAttribute) void {
-        self.write(.{ @enumToInt(code), 'm' });
+        self.write(.{ @intFromEnum(code), 'm' });
     }
 
     const WinSize = struct {
@@ -166,7 +166,7 @@ pub const Terminal = struct {
     pub fn windowSize(self: *Terminal) ?WinSize {
         var size: system.winsize = undefined;
 
-        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @ptrToInt(&size)) == -1) {
+        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @intFromPtr(&size)) == -1) {
             return null;
         }
 

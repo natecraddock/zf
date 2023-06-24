@@ -285,7 +285,7 @@ pub fn rankToken(
                     // how much of the query token segment matched the path segment?
                     // "mod" would match "module" better than "modules" for example
                     const path_segment_len = segmentLen(str, start_index);
-                    const coverage = 1.0 - (@intToFloat(f64, segment.len) / @intToFloat(f64, path_segment_len));
+                    const coverage = 1.0 - (@floatFromInt(f64, segment.len) / @floatFromInt(f64, path_segment_len));
                     const rank = coverage * scan.rank;
 
                     if (best_rank == null) {
@@ -317,7 +317,7 @@ pub fn rankToken(
             if (token.len == filename.len) {
                 best_rank.? /= 2.0;
             } else {
-                const coverage = 1.0 - (@intToFloat(f64, token.len) / @intToFloat(f64, filename.len));
+                const coverage = 1.0 - (@floatFromInt(f64, token.len) / @floatFromInt(f64, filename.len));
                 best_rank.? *= coverage;
             }
 
@@ -459,7 +459,7 @@ pub fn highlightToken(
                     // how much of the query token segment matched the path segment?
                     // "mod" would match "module" better than "modules" for example
                     const path_segment_len = segmentLen(str, start_index);
-                    const coverage = 1.0 - (@intToFloat(f64, segment.len) / @intToFloat(f64, path_segment_len));
+                    const coverage = 1.0 - (@floatFromInt(f64, segment.len) / @floatFromInt(f64, path_segment_len));
                     const rank = coverage * scan.rank;
 
                     if (best_rank == null) {
@@ -573,7 +573,7 @@ fn scanToEnd(
 
                 // normal match
                 last_sequential = false;
-                rank += @intToFloat(f64, idx - last_index);
+                rank += @floatFromInt(f64, idx - last_index);
             }
 
             last_index = idx;

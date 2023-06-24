@@ -4,8 +4,8 @@
     .version = "0.9.0",
     .dependencies = .{
         .ziglyph = .{
-            .url = "https://github.com/jecolon/ziglyph/archive/d87a243b2007d43755e11539b944075822fb17b5.tar.gz",
-            .hash = "12201f6b22da5996ff8c875638463285971fd86183d70827a6383146c05a620b8c9c",
+            .url = "https://github.com/natecraddock/ziglyph/archive/e8ff3a55c07404a2a0c5b217c1c8dc7347369b5a.tar.gz",
+            .hash = "1220e15bc337e14d17623a037d53203158a4d23dbb81962f1c650c4c408ad7beaa04",
         }
     },
 }

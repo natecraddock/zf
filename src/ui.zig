@@ -189,7 +189,7 @@ fn draw(
     // position the cursor at the edit location
     terminal.cursorCol(0);
     const cursor_width = try dw.strWidth(query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, query.cursor)), .half);
-    terminal.cursorRight(std.math.min(width - 1, cursor_width + state.prompt_width));
+    terminal.cursorRight(@min(width - 1, cursor_width + state.prompt_width));
 
     try terminal.writer.flush();
 }
@@ -388,7 +388,7 @@ pub fn run(
             try draw(terminal, &state, &query, tokens, filtered, selected_rows, candidates.len, case_sensitive, plain);
         }
 
-        const visible_rows = std.math.min(terminal.height, filtered.len);
+        const visible_rows = @min(terminal.height, filtered.len);
 
         const event = try loop.wait();
         switch (event) {

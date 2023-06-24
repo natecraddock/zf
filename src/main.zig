@@ -289,7 +289,7 @@ pub fn main() anyerror!void {
         const highlight_color: SGRAttribute = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
             inline for (std.meta.fields(SGRAttribute)) |field| {
                 if (eql(u8, value, field.name)) {
-                    break :blk @intToEnum(SGRAttribute, field.value);
+                    break :blk @enumFromInt(SGRAttribute, field.value);
                 }
             }
             break :blk .cyan;
