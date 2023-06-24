@@ -11,6 +11,7 @@ const ArrayList = std.ArrayList;
 const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
+const Loop = @import("Loop.zig");
 const Terminal = term.Terminal;
 
 const sep = std.fs.path.sep;
@@ -364,6 +365,8 @@ pub fn run(
 
     var selected_rows = ArrayToggleSet(usize).init(allocator);
 
+    var loop = try Loop.init(terminal.tty.handle);
+
     while (true) {
         // did the query change?
         if (query.dirty) {
@@ -386,6 +389,12 @@ pub fn run(
         }
 
         const visible_rows = std.math.min(terminal.height, filtered.len);
+
+        const event = try loop.wait();
+        switch (event) {
+            .resize => redraw = true,
+            else => {},
+        }
 
         var buf: [2048]u8 = undefined;
         const input = try terminal.read(&buf);

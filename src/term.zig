@@ -80,6 +80,7 @@ pub const Terminal = struct {
         };
     }
 
+    // TODO: remove this
     pub fn nodelay(self: *Terminal, state: bool) void {
         self.raw_termios.cc[system.V.MIN] = if (state) 0 else 1;
         std.os.tcsetattr(self.tty.handle, .NOW, self.raw_termios) catch unreachable;
@@ -177,7 +178,6 @@ pub const Terminal = struct {
     // buffer. If that is the case this will need to be refactored.
     pub fn read(self: *Terminal, buf: []u8) !InputBuffer {
         const reader = self.tty.reader();
-        defer self.nodelay(false);
 
         var index: usize = 0;
         // Ensure at least 4 bytes of space in the buffer so it is safe
@@ -188,7 +188,6 @@ pub const Terminal = struct {
                 error.InvalidUtf8 => continue,
                 else => return err,
             };
-            self.nodelay(true);
             if (cp) |c| {
                 // An escape sequence start
                 if (ziglyph.isControl(c)) {

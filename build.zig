@@ -29,6 +29,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe.addCSourceFile("src/loop.c", &.{});
+
     exe.addModule("ziglyph", ziglyph.module("ziglyph"));
     b.installArtifact(exe);
 
