@@ -361,7 +361,6 @@ pub fn run(
 
     var loop = try Loop.init(terminal.tty.handle);
     while (true) {
-        // did the query change?
         if (state.query.dirty) {
             state.query.dirty = false;
 
@@ -375,70 +374,78 @@ pub fn run(
             state.selected_rows.clear();
         }
 
-        // do we need to redraw?
         if (state.redraw) {
             state.redraw = false;
             try draw(terminal, &state, tokens, filtered, candidates.len, plain);
         }
 
-        const visible_rows = @min(terminal.height, filtered.len);
-
         const event = try loop.wait();
         switch (event) {
             .resize => state.redraw = true,
-            else => {},
-        }
-
-        var buf: [2048]u8 = undefined;
-        const input = try terminal.read(&buf);
-        const action = inputToAction(input, vi_mode);
-
-        const last_cursor = state.query.cursor;
-        const last_selected = state.selected;
-        const last_offset = state.offset;
-
-        switch (action) {
-            .str => |str| try state.query.insert(str),
-            .delete_word => if (state.query.len > 0) deleteWord(&state.query),
-            .delete_line => state.query.deleteTo(0),
-            .delete_line_forward => state.query.deleteTo(state.query.len),
-            .backspace => state.query.delete(1, .left),
-            .delete => state.query.delete(1, .right),
-            .line_up => lineUp(&state),
-            .line_down => lineDown(&state, visible_rows, filtered.len - visible_rows),
-            .cursor_left => state.query.moveCursor(1, .left),
-            .cursor_leftmost => state.query.setCursor(0),
-            .cursor_rightmost => state.query.setCursor(state.query.len),
-            .cursor_right => state.query.moveCursor(1, .right),
-            .select_up => {
-                try state.selected_rows.toggle(state.selected + state.offset);
-                lineUp(&state);
-                state.redraw = true;
-            },
-            .select_down => {
-                try state.selected_rows.toggle(state.selected + state.offset);
-                lineDown(&state, visible_rows, filtered.len - visible_rows);
-                state.redraw = true;
-            },
-            .confirm => {
-                if (filtered.len == 0) break;
-                if (state.selected_rows.slice().len > 0) {
-                    var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
-                    for (state.selected_rows.slice(), 0..) |index, i| {
-                        selected_buf[i] = filtered[index].str;
-                    }
-                    return selected_buf;
+            .tty => {
+                if (try handleInput(allocator, terminal, &state, filtered, vi_mode)) |selected| {
+                    if (selected.len == 0) return null else return selected;
                 }
-                var selected_buf = try allocator.alloc([]const u8, 1);
-                selected_buf[0] = filtered[state.selected + state.offset].str;
-                return selected_buf;
             },
-            .close => break,
-            .pass => {},
         }
-
-        state.redraw = state.redraw or last_cursor != state.query.cursor or last_selected != state.selected or last_offset != state.offset;
     }
+
+    return null;
+}
+
+fn handleInput(allocator: Allocator, terminal: *Terminal, state: *State, filtered: []Candidate, vi_mode: bool) !?[]const []const u8 {
+    var buf: [2048]u8 = undefined;
+    const input = try terminal.read(&buf);
+    const action = inputToAction(input, vi_mode);
+
+    var query = &state.query;
+    const last_cursor = query.cursor;
+    const last_selected = state.selected;
+    const last_offset = state.offset;
+
+    const visible_rows = @min(terminal.height, filtered.len);
+
+    switch (action) {
+        .str => |str| try query.insert(str),
+        .delete_word => if (query.len > 0) deleteWord(query),
+        .delete_line => query.deleteTo(0),
+        .delete_line_forward => query.deleteTo(query.len),
+        .backspace => query.delete(1, .left),
+        .delete => query.delete(1, .right),
+        .line_up => lineUp(state),
+        .line_down => lineDown(state, visible_rows, filtered.len - visible_rows),
+        .cursor_left => query.moveCursor(1, .left),
+        .cursor_leftmost => query.setCursor(0),
+        .cursor_rightmost => query.setCursor(query.len),
+        .cursor_right => query.moveCursor(1, .right),
+        .select_up => {
+            try state.selected_rows.toggle(state.selected + state.offset);
+            lineUp(state);
+            state.redraw = true;
+        },
+        .select_down => {
+            try state.selected_rows.toggle(state.selected + state.offset);
+            lineDown(state, visible_rows, filtered.len - visible_rows);
+            state.redraw = true;
+        },
+        .confirm => {
+            if (filtered.len == 0) return &.{};
+            if (state.selected_rows.slice().len > 0) {
+                var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
+                for (state.selected_rows.slice(), 0..) |index, i| {
+                    selected_buf[i] = filtered[index].str;
+                }
+                return selected_buf;
+            }
+            var selected_buf = try allocator.alloc([]const u8, 1);
+            selected_buf[0] = filtered[state.selected + state.offset].str;
+            return selected_buf;
+        },
+        .close => return &.{},
+        .pass => {},
+    }
+
+    state.redraw = state.redraw or last_cursor != state.query.cursor or last_selected != state.selected or last_offset != state.offset;
 
     return null;
 }
