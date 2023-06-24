@@ -8,18 +8,19 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{matrix.os}}
 
     steps:
     - name: Clone zf
       uses: actions/checkout@v3
-      with:
-        submodules: 'recursive'
 
     - name: Setup Zig
-      uses: goto-bus-stop/setup-zig@v1
+      uses: goto-bus-stop/setup-zig@v2
       with:
-        version: 0.10.0
+        version: master
 
     - name: Run tests
       run: zig build test
