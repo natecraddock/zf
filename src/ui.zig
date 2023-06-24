@@ -17,10 +17,14 @@ const Terminal = term.Terminal;
 const sep = std.fs.path.sep;
 
 const State = struct {
-    selected: usize,
-    offset: usize,
+    selected: usize = 0,
+    selected_rows: ArrayToggleSet(usize),
+    offset: usize = 0,
     prompt: []const u8,
     prompt_width: usize,
+    query: EditBuffer,
+    redraw: bool = true,
+    case_sensitive: bool = false,
 };
 
 const HighlightSlicer = struct {
@@ -134,12 +138,9 @@ inline fn numDigits(number: usize) u16 {
 fn draw(
     terminal: *Terminal,
     state: *State,
-    query: *EditBuffer,
     tokens: [][]const u8,
     candidates: []Candidate,
-    selected_rows: ArrayToggleSet(usize),
     total_candidates: usize,
-    case_sensitive: bool,
     plain: bool,
 ) !void {
     const width = terminal.windowSize().?.x;
@@ -154,9 +155,9 @@ fn draw(
             candidates[line + state.offset],
             tokens,
             width,
-            selected_rows.contains(line + state.offset),
+            state.selected_rows.contains(line + state.offset),
             line == state.selected,
-            case_sensitive,
+            state.case_sensitive,
             plain,
         );
     }
@@ -165,7 +166,7 @@ fn draw(
     terminal.clearLine();
 
     // draw the stats
-    const num_selected = selected_rows.slice().len;
+    const num_selected = state.selected_rows.slice().len;
     const stats_width = blk: {
         if (num_selected > 0) {
             const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
@@ -183,12 +184,12 @@ fn draw(
 
     // draw the prompt
     // TODO: handle display of queries longer than the screen width
-    const query_width = try dw.strWidth(query.slice(), .half);
-    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)) });
+    const query_width = try dw.strWidth(state.query.slice(), .half);
+    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(state.query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)) });
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
-    const cursor_width = try dw.strWidth(query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, query.cursor)), .half);
+    const cursor_width = try dw.strWidth(state.query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, state.query.cursor)), .half);
     terminal.cursorRight(@min(width - 1, cursor_width + state.prompt_width));
 
     try terminal.writer.flush();
@@ -331,16 +332,6 @@ pub fn run(
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const []const u8 {
-    var query = EditBuffer.init(allocator);
-    defer query.deinit();
-
-    var state = State{
-        .selected = 0,
-        .offset = 0,
-        .prompt = prompt_str,
-        .prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half),
-    };
-
     // ensure enough room to draw all lines of output by drawing blank lines,
     // effectively scrolling the view. + 1 to also include the prompt's offset
     terminal.determineHeight();
@@ -354,45 +345,47 @@ pub fn run(
         }
         break :blk try filtered.toOwnedSlice();
     };
-
-    var tokens_buf = try allocator.alloc([]const u8, 16);
-    var tokens: [][]const u8 = splitQuery(tokens_buf, query.slice());
-    var case_sensitive: bool = hasUpper(query.slice());
-
     var filtered_buf = try allocator.alloc(Candidate, candidates.len);
 
-    var redraw = true;
+    var state = State{
+        .selected = 0,
+        .selected_rows = ArrayToggleSet(usize).init(allocator),
+        .offset = 0,
+        .prompt = prompt_str,
+        .prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half),
+        .query = EditBuffer.init(allocator),
+    };
 
-    var selected_rows = ArrayToggleSet(usize).init(allocator);
+    var tokens_buf = try allocator.alloc([]const u8, 16);
+    var tokens = splitQuery(tokens_buf, state.query.slice());
 
     var loop = try Loop.init(terminal.tty.handle);
-
     while (true) {
         // did the query change?
-        if (query.dirty) {
-            query.dirty = false;
+        if (state.query.dirty) {
+            state.query.dirty = false;
 
-            tokens = splitQuery(tokens_buf, (try normalizer.nfd(allocator, query.slice())).slice);
-            case_sensitive = hasUpper(query.slice());
+            tokens = splitQuery(tokens_buf, (try normalizer.nfd(allocator, state.query.slice())).slice);
+            state.case_sensitive = hasUpper(state.query.slice());
 
-            filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, case_sensitive);
-            redraw = true;
+            filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, state.case_sensitive);
+            state.redraw = true;
             state.selected = 0;
             state.offset = 0;
-            selected_rows.clear();
+            state.selected_rows.clear();
         }
 
         // do we need to redraw?
-        if (redraw) {
-            redraw = false;
-            try draw(terminal, &state, &query, tokens, filtered, selected_rows, candidates.len, case_sensitive, plain);
+        if (state.redraw) {
+            state.redraw = false;
+            try draw(terminal, &state, tokens, filtered, candidates.len, plain);
         }
 
         const visible_rows = @min(terminal.height, filtered.len);
 
         const event = try loop.wait();
         switch (event) {
-            .resize => redraw = true,
+            .resize => state.redraw = true,
             else => {},
         }
 
@@ -400,38 +393,38 @@ pub fn run(
         const input = try terminal.read(&buf);
         const action = inputToAction(input, vi_mode);
 
-        const last_cursor = query.cursor;
+        const last_cursor = state.query.cursor;
         const last_selected = state.selected;
         const last_offset = state.offset;
 
         switch (action) {
-            .str => |str| try query.insert(str),
-            .delete_word => if (query.len > 0) deleteWord(&query),
-            .delete_line => query.deleteTo(0),
-            .delete_line_forward => query.deleteTo(query.len),
-            .backspace => query.delete(1, .left),
-            .delete => query.delete(1, .right),
+            .str => |str| try state.query.insert(str),
+            .delete_word => if (state.query.len > 0) deleteWord(&state.query),
+            .delete_line => state.query.deleteTo(0),
+            .delete_line_forward => state.query.deleteTo(state.query.len),
+            .backspace => state.query.delete(1, .left),
+            .delete => state.query.delete(1, .right),
             .line_up => lineUp(&state),
             .line_down => lineDown(&state, visible_rows, filtered.len - visible_rows),
-            .cursor_left => query.moveCursor(1, .left),
-            .cursor_leftmost => query.setCursor(0),
-            .cursor_rightmost => query.setCursor(query.len),
-            .cursor_right => query.moveCursor(1, .right),
+            .cursor_left => state.query.moveCursor(1, .left),
+            .cursor_leftmost => state.query.setCursor(0),
+            .cursor_rightmost => state.query.setCursor(state.query.len),
+            .cursor_right => state.query.moveCursor(1, .right),
             .select_up => {
-                try selected_rows.toggle(state.selected + state.offset);
+                try state.selected_rows.toggle(state.selected + state.offset);
                 lineUp(&state);
-                redraw = true;
+                state.redraw = true;
             },
             .select_down => {
-                try selected_rows.toggle(state.selected + state.offset);
+                try state.selected_rows.toggle(state.selected + state.offset);
                 lineDown(&state, visible_rows, filtered.len - visible_rows);
-                redraw = true;
+                state.redraw = true;
             },
             .confirm => {
                 if (filtered.len == 0) break;
-                if (selected_rows.slice().len > 0) {
-                    var selected_buf = try allocator.alloc([]const u8, selected_rows.slice().len);
-                    for (selected_rows.slice(), 0..) |index, i| {
+                if (state.selected_rows.slice().len > 0) {
+                    var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
+                    for (state.selected_rows.slice(), 0..) |index, i| {
                         selected_buf[i] = filtered[index].str;
                     }
                     return selected_buf;
@@ -444,7 +437,7 @@ pub fn run(
             .pass => {},
         }
 
-        redraw = redraw or last_cursor != query.cursor or last_selected != state.selected or last_offset != state.offset;
+        state.redraw = state.redraw or last_cursor != state.query.cursor or last_selected != state.selected or last_offset != state.offset;
     }
 
     return null;
