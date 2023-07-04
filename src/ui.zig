@@ -132,7 +132,7 @@ inline fn drawCandidate(
 
 inline fn numDigits(number: usize) u16 {
     if (number == 0) return 1;
-    return @intCast(u16, std.math.log10(number) + 1);
+    return @intCast(std.math.log10(number) + 1);
 }
 
 fn draw(

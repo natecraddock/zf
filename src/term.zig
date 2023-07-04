@@ -239,7 +239,7 @@ pub const Terminal = struct {
         }
 
         // keys pressed while holding control will always be below 0x20
-        if (cp <= 0x1f) return .{ .control = @intCast(u8, cp & 0x1f) };
+        if (cp <= 0x1f) return .{ .control = @intCast(cp & 0x1f) };
 
         return .none;
     }
