@@ -379,7 +379,7 @@ pub fn run(
             try draw(terminal, &state, tokens, filtered, candidates.len, plain);
         }
 
-        const event = try loop.wait();
+        const event = loop.wait();
         switch (event) {
             .resize => state.redraw = true,
             .tty => {
@@ -387,10 +387,10 @@ pub fn run(
                     if (selected.len == 0) return null else return selected;
                 }
             },
+            .child_out => {},
+            .child_err => {},
         }
     }
-
-    return null;
 }
 
 fn handleInput(allocator: Allocator, terminal: *Terminal, state: *State, filtered: []Candidate, vi_mode: bool) !?[]const []const u8 {

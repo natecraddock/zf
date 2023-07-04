@@ -4,7 +4,7 @@
     .version = "0.9.0",
     .dependencies = .{
         .ziglyph = .{
-            .url = "https://github.com/natecraddock/ziglyph/archive/d5c4a6cd20ccc3dd3f8433fee1c90cc2d048998d.tar.gz",
+            .url = "https://github.com/jecolon/ziglyph/archive/1201bf393a9c8ae4e1564d01e4e4d9377e2c89de.tar.gz",
             .hash = "12203f350e5cd707acfc46980614c928e90b41f86cf2cbc926888293e6f5b63ad9f1",
         }
     },

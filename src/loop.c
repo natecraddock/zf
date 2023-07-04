@@ -7,30 +7,41 @@
 #include <sys/errno.h>
 #include <sys/select.h>
 
-int wait_internal(int ttyfd) {
+#define RESIZE -1
 
+int wait_internal(const int *fds, int nfds, int *ready) {
     fd_set read_set;
     FD_ZERO(&read_set);
-    FD_SET(ttyfd, &read_set);
+
+    int max_fd = -1;
+    for (int i = 0; i < nfds; i++) {
+        FD_SET(fds[i], &read_set);
+        if (fds[i] > max_fd) {
+            max_fd = fds[i];
+        }
+    }
 
     // Create a set that only allows SIGWINCH through
     sigset_t sigwinch_set;
     sigfillset(&sigwinch_set);
     sigdelset(&sigwinch_set, SIGWINCH);
 
-    if (pselect(ttyfd + 1, &read_set, NULL, NULL, NULL, &sigwinch_set) == -1) {
+    if (pselect(max_fd + 1, &read_set, NULL, NULL, NULL, &sigwinch_set) == -1) {
         // The only signals that can get through are SIGKILL, SIGSTOP, and SIGWINCH.
         // The first two will kill the program no matter what we do, so we assume
         // the signal is SIGWINCH. If it is we redraw, otherwise zf will exit.
         if (errno == EINTR) {
-            return -1;
+            return RESIZE;
         }
     }
 
-    if (FD_ISSET(ttyfd, &read_set)) {
-        return ttyfd;
+    int num_ready = 0;
+    for (int i = 0; i < nfds; i++) {
+        if (FD_ISSET(fds[i], &read_set)) {
+            ready[num_ready] = fds[i];
+            num_ready += 1;
+        }
     }
 
-    // Some unreachable error occurred
-    return -2;
+    return num_ready;
 }
