@@ -25,30 +25,35 @@ to a maximum of 16 whitespace-separated tokens.
 Matching is case insensitive unless an uppercase letter is found in the query.
 
 .SH OPTIONS
+
+.TP
+.BR \-d ", " \-\-delimiter
+Set the delimiter used to split candidates (default \\n)
+.
 .TP
 .BR \-f ", " \-\-filter
 Skip interactive use and filter using the given query
-
+.
 .TP
 .BR \-k ", " \-\-keep\-order
 Don't sort by rank and preserve order of lines read on stdin. This makes zf remove
 any lines that don't match, but the order of lines will not change.
-
+.
 .TP
 .BR \-l ", " \-\-lines
 Set the maximum number of result lines to show. Defaults to 10. Will be clamped
 to the number of candidates or the height of the terminal, whichever is
 greater. Set to a large number (like 1000) to display zf full screen.
-
+.
 .TP
 .BR \-p ", " \-\-plain
 Treat input as plaintext and disable filepath matching features. Useful when the input lines are not
 file paths.
-
+.
 .TP
 .BR \-v ", " \-\-version
 Show version information and exit
-
+.
 .TP
 .BR \-h ", " \-\-help
 Display help and exit
@@ -76,55 +81,55 @@ Disables colors. See https://no-color.org
 .TP
 .BR enter
 Write the selected line or all marked lines to stdout and exit
-
+.
 .TP
 .BR "escape, ctrl-c"
 Exit zf without selecting anything
-
+.
 .TP
 .BR "up, ctrl-p, ctrl-k"
 Select the next line up
-
+.
 .TP
 .BR "down ctrl-n, ctrl-j"
 Select the next line down
-
+.
 .TP
 .BR "tab"
 Mark the current line as selected and select the next line
-
+.
 .TP
 .BR shift-tab
 Mark the current line as selected and select the previous line
-
+.
 .TP
 .BR "left, ctrl-b"
 Move the cursor left
-
+.
 .TP
 .BR "right, ctrl-f"
 Move the cursor right
-
+.
 .TP
 .BR ctrl-a
 Move the cursor to the beginning of the line
-
+.
 .TP
 .BR ctrl-e
 Move the cursor to the end of the line
-
+.
 .TP
 .BR "backspace, ctrl-h"
 Delete the character before the cursor
-
+.
 .TP
 .BR "delete, ctrl-d"
 Delete the character under the cursor
-
+.
 .TP
 .BR ctrl-w
 Delete the word before the cursor
-
+.
 .TP
 .BR ctrl-u
 Delete from the cursor to the beginning of the line
@@ -134,11 +139,11 @@ Delete from the cursor to the beginning of the line
 .TP
 .BR "find -type f | zf"
 Fuzzy find on the file tree in the current directory
-
+.
 .TP
 .BR "vim $(find -type f | zf)"
 Fuzzy find on the file tree and open the selcted file in vim
-
+.
 .TP
 .BR "git switch $(git branch | cut -c 3- | zf)"
 Switch to selected git branch
@@ -148,11 +153,11 @@ Switch to selected git branch
 .TP
 .BR 0
 Success
-
+.
 .TP
 .BR 1
 No candidates given on stdin or aborted the interactive interface with esc or ctrl-c
-
+.
 .TP
 .BR 2
 Error
