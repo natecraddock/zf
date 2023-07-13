@@ -1,0 +1,82 @@
+//! Manages child processes used for previewing information about the selected line
+
+const process = std.process;
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+const Child = process.Child;
+const Loop = @import("Loop.zig");
+
+const Previewer = @This();
+
+allocator: Allocator,
+loop: *Loop,
+
+shell: []const u8,
+cmd_parts: [2][]const u8,
+
+child: ?Child = null,
+stdout: ArrayList(u8),
+stderr: ArrayList(u8),
+
+pub fn init(allocator: Allocator, loop: *Loop, cmd: []const u8, arg: []const u8) !Previewer {
+    const shell = process.getEnvVarOwned(allocator, "SHELL") catch "/bin/sh";
+
+    var iter = std.mem.tokenizeSequence(u8, cmd, "{}");
+    var cmd_parts = [2][]const u8{
+        iter.next() orelse cmd,
+        iter.next() orelse "",
+    };
+
+    var previewer = Previewer{
+        .allocator = allocator,
+        .loop = loop,
+        .shell = shell,
+        .cmd_parts = cmd_parts,
+        .stdout = ArrayList(u8).init(allocator),
+        .stderr = ArrayList(u8).init(allocator),
+    };
+    try previewer.spawn(arg);
+
+    return previewer;
+}
+
+pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
+    previewer.stdout.clearRetainingCapacity();
+    previewer.stderr.clearRetainingCapacity();
+    if (previewer.child) |*child| {
+        _ = try child.kill();
+    }
+
+    const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s}", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
+
+    var child = Child.init(&.{ previewer.shell, "-c", command }, previewer.allocator);
+    child.stdin_behavior = .Close;
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+    try child.spawn();
+
+    previewer.loop.setChild(child.stdout.?.handle, child.stderr.?.handle);
+
+    previewer.child = child;
+}
+
+pub fn read(previewer: *Previewer) !void {
+    if (previewer.child) |*child| {
+        var bytes_read: usize = 0;
+        while (true) {
+            var buf: [1024]u8 = undefined;
+            const len = try child.stdout.?.read(&buf);
+            bytes_read += len;
+            if (len == 0) break;
+            try previewer.stdout.appendSlice(buf[0..len]);
+        }
+
+        if (bytes_read == 0) {
+            _ = try child.kill();
+            previewer.child = null;
+            previewer.loop.clearChild();
+        }
+    }
+}

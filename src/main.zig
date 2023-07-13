@@ -20,13 +20,14 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 const help =
     \\Usage: zf [options]
     \\
-    \\-d, --delimiter  Set the delimiter used to split candidates (default \n)
-    \\-f, --filter     Skip interactive use and filter using the given query
-    \\-k, --keep-order Don't sort by rank and preserve order of lines read on stdin
-    \\-l, --lines      Set the maximum number of result lines to show (default 10)
-    \\-p, --plain      Treat input as plaintext and disable filepath matching features
-    \\-v, --version    Show version information and exit
-    \\-h, --help       Display this help and exit
+    \\-d, --delimiter=DELIMITER  Set the delimiter used to split candidates (default \n)
+    \\-f, --filter               Skip interactive use and filter using the given query
+    \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
+    \\-l, --lines=LINES          Set the maximum number of result lines to show (default 10)
+    \\-p, --plain                Treat input as plaintext and disable filepath matching features
+    \\    --preview=COMMAND      Execute COMMAND for the selected line and display the output in a preview window
+    \\-v, --version              Show version information and exit
+    \\-h, --help                 Display this help and exit
 ;
 
 const Config = struct {
@@ -38,6 +39,7 @@ const Config = struct {
     plain: bool = false,
     query: []u8 = undefined,
     delimiter: []const u8 = "\n",
+    preview: ?[]const u8 = null,
 
     // HACK: error unions cannot return a value, so return error messages in
     // the config struct instead
@@ -120,6 +122,19 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
                 return config;
             }
 
+            skip = true;
+        } else if (eql(u8, arg, "--preview")) {
+            if (index + 1 > args.len - 1) {
+                config.err = true;
+                config.err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "zf: option '{s}' requires an argument\n{s}",
+                    .{ arg, help },
+                );
+                return config;
+            }
+
+            config.preview = try allocator.dupe(u8, args[index + 1]);
             skip = true;
         } else {
             config.err = true;
@@ -304,6 +319,7 @@ pub fn main() anyerror!void {
             candidates,
             config.keep_order,
             config.plain,
+            config.preview,
             prompt_str,
             vi_mode,
         ) catch |err| switch (err) {

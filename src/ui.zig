@@ -12,6 +12,7 @@ const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
 const Loop = @import("Loop.zig");
+const Previewer = @import("Previewer.zig");
 const Terminal = term.Terminal;
 
 const sep = std.fs.path.sep;
@@ -25,6 +26,8 @@ const State = struct {
     query: EditBuffer,
     redraw: bool = true,
     case_sensitive: bool = false,
+    selection_changed: bool = false,
+    preview: ?Previewer = null,
 };
 
 const HighlightSlicer = struct {
@@ -329,6 +332,7 @@ pub fn run(
     candidates: [][]const u8,
     keep_order: bool,
     plain: bool,
+    preview_cmd: ?[]const u8,
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const []const u8 {
@@ -360,6 +364,10 @@ pub fn run(
     var tokens = splitQuery(tokens_buf, state.query.slice());
 
     var loop = try Loop.init(terminal.tty.handle);
+    if (preview_cmd) |cmd| {
+        state.preview = try Previewer.init(allocator, &loop, cmd, filtered[0].str);
+    }
+
     while (true) {
         if (state.query.dirty) {
             state.query.dirty = false;
@@ -372,6 +380,12 @@ pub fn run(
             state.selected = 0;
             state.offset = 0;
             state.selected_rows.clear();
+        }
+
+        // The selection changed and the child process should be respawned
+        if (state.selection_changed and state.preview != null) {
+            state.selection_changed = false;
+            try state.preview.?.spawn(filtered[state.selected + state.offset].str);
         }
 
         if (state.redraw) {
@@ -387,8 +401,13 @@ pub fn run(
                     if (selected.len == 0) return null else return selected;
                 }
             },
-            .child_out => {},
-            .child_err => {},
+            .child_out => {
+                try state.preview.?.read();
+                state.redraw = true;
+            },
+            .child_err => {
+                state.redraw = true;
+            },
         }
     }
 }
@@ -445,6 +464,7 @@ fn handleInput(allocator: Allocator, terminal: *Terminal, state: *State, filtere
         .pass => {},
     }
 
+    state.selection_changed = state.redraw or last_selected != state.selected or last_offset != state.offset or query.dirty;
     state.redraw = state.redraw or last_cursor != state.query.cursor or last_selected != state.selected or last_offset != state.offset;
 
     return null;

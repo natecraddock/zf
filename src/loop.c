@@ -7,7 +7,6 @@
 #include <sys/errno.h>
 #include <sys/select.h>
 
-#define RESIZE -1
 
 int wait_internal(const int *fds, int nfds, int *ready) {
     fd_set read_set;
@@ -27,12 +26,7 @@ int wait_internal(const int *fds, int nfds, int *ready) {
     sigdelset(&sigwinch_set, SIGWINCH);
 
     if (pselect(max_fd + 1, &read_set, NULL, NULL, NULL, &sigwinch_set) == -1) {
-        // The only signals that can get through are SIGKILL, SIGSTOP, and SIGWINCH.
-        // The first two will kill the program no matter what we do, so we assume
-        // the signal is SIGWINCH. If it is we redraw, otherwise zf will exit.
-        if (errno == EINTR) {
-            return RESIZE;
-        }
+        return -1;
     }
 
     int num_ready = 0;

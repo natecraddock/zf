@@ -7,6 +7,8 @@ const builtin = @import("builtin");
 const os = std.os;
 const std = @import("std");
 
+const errno = os.errno;
+
 const Loop = @This();
 
 const SIG_BLOCK = if (builtin.os.tag == .macos) os.SIG._BLOCK else os.SIG.BLOCK;
@@ -55,6 +57,11 @@ pub fn setChild(loop: *Loop, outfd: os.fd_t, errfd: os.fd_t) void {
     loop.child_err = errfd;
 }
 
+pub fn clearChild(loop: *Loop) void {
+    loop.child_out = null;
+    loop.child_err = null;
+}
+
 /// This function is defined in loop.c
 extern "c" fn wait_internal(fds: [*]const c_int, nfds: c_int, ready: [*]c_int) c_int;
 
@@ -78,10 +85,18 @@ pub fn wait(loop: *Loop) Event {
     const has_child = loop.child_out != null;
 
     var ready: [3]os.fd_t = undefined;
-    const num_ready = wait_internal(&fds, if (has_child) 3 else 1, &ready);
-    if (num_ready == -1) {
-        return .resize;
-    }
+    const result = wait_internal(&fds, if (has_child) 3 else 1, &ready);
+    const num_ready = switch (errno(result)) {
+        .SUCCESS => result,
+        .AGAIN => @panic("EAGAIN"),
+        .BADF => @panic("EBADF"),
+        // The only signals that can get through are SIGKILL, SIGSTOP, and SIGWINCH.
+        // The first two will kill the program no matter what we do, so we assume
+        // the signal is SIGWINCH. If it is we redraw, otherwise zf will exit.
+        .INTR => return .resize,
+        .INVAL => @panic("EINVAL"),
+        else => unreachable,
+    };
 
     // It is possible for multiple events to occur, so add all to pending array
     for (ready[0..@intCast(num_ready)], 0..) |fd, i| {
