@@ -2,7 +2,6 @@ const std = @import("std");
 const system = std.os.system;
 const ziglyph = @import("ziglyph");
 
-const BufferedWriter = std.io.BufferedWriter;
 const File = std.fs.File;
 
 // Select Graphic Rendition (SGR) attributes
@@ -47,7 +46,7 @@ pub const InputBuffer = union(enum) {
 
 pub const Terminal = struct {
     tty: File,
-    writer: BufferedWriter(4096, File.Writer),
+    writer: File.Writer,
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
@@ -56,6 +55,10 @@ pub const Terminal = struct {
 
     no_color: bool,
     highlight_color: SGRAttribute,
+
+    /// buffered writes to the terminal for performance
+    buffer: [4096]u8 = undefined,
+    index: usize = 0,
 
     pub fn init(max_height: usize, highlight_color: SGRAttribute, no_color: bool) !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
@@ -71,7 +74,7 @@ pub const Terminal = struct {
 
         return Terminal{
             .tty = tty,
-            .writer = std.io.bufferedWriter(tty.writer()),
+            .writer = tty.writer(),
             .termios = termios,
             .raw_termios = raw_termios,
             .max_height = max_height,
@@ -95,7 +98,7 @@ pub const Terminal = struct {
         self.clearLine();
         self.cursorUp(self.height);
 
-        try self.writer.flush();
+        self.flush();
 
         std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
@@ -106,56 +109,80 @@ pub const Terminal = struct {
         self.height = std.math.clamp(self.max_height, 1, win_size.?.y - 1);
     }
 
-    pub fn print(self: *Terminal, comptime str: []const u8, args: anytype) void {
-        const writer = self.writer.writer();
-        writer.print(str, args) catch unreachable;
+    /// Buffered write interface
+    pub fn write(self: *Terminal, bytes: []const u8) void {
+        if (self.index + bytes.len > self.buffer.len) {
+            self.flush();
+            if (bytes.len > self.buffer.len) self.writer.writeAll(bytes) catch unreachable;
+        }
+
+        const new_index = self.index + bytes.len;
+        @memcpy(self.buffer[self.index..new_index], bytes);
+        self.index = new_index;
     }
 
-    fn write(self: *Terminal, args: anytype) void {
-        const writer = self.writer.writer();
-        writer.print("\x1b[{d}{c}", args) catch unreachable;
+    /// Formatted write interface≈
+    pub fn print(self: *Terminal, comptime fmt: []const u8, args: anytype) void {
+        var buf: [512]u8 = undefined;
+        const bytes = std.fmt.bufPrint(&buf, fmt, args) catch unreachable;
+        self.write(bytes);
     }
 
-    pub fn writeBytes(self: *Terminal, bytes: []const u8) void {
-        const writer = self.writer.writer();
-        _ = writer.write(bytes) catch unreachable;
+    pub fn flush(self: *Terminal) void {
+        if (self.index == 0) return;
+        self.writer.writeAll(self.buffer[0..self.index]) catch unreachable;
+        self.index = 0;
+    }
+
+    fn escape(self: *Terminal, args: anytype) void {
+        self.print("\x1b[{d}{c}", args);
     }
 
     pub fn clearLine(self: *Terminal) void {
         self.cursorCol(1);
-        self.write(.{ 2, 'K' });
+        self.escape(.{ 2, 'K' });
+    }
+
+    pub fn clearToEndOfLine(self: *Terminal) void {
+        self.escape(.{ 0, 'K' });
     }
 
     pub fn scrollDown(self: *Terminal, num: usize) void {
         var i: usize = 0;
         while (i < num) : (i += 1) {
-            _ = self.writer.write("\n") catch unreachable;
+            self.write("\n");
         }
     }
 
     pub fn cursorUp(self: *Terminal, num: usize) void {
-        self.write(.{ num, 'A' });
+        self.escape(.{ num, 'A' });
     }
 
     pub fn cursorDown(self: *Terminal, num: usize) void {
-        self.write(.{ num, 'B' });
+        self.escape(.{ num, 'B' });
     }
 
     pub fn cursorRight(self: *Terminal, num: usize) void {
         if (num == 0) return;
-        self.write(.{ num, 'C' });
+        self.escape(.{ num, 'C' });
     }
 
     pub fn cursorLeft(self: *Terminal, num: usize) void {
-        self.write(.{ num, 'D' });
+        self.escape(.{ num, 'D' });
     }
 
     pub fn cursorCol(self: *Terminal, col: usize) void {
-        self.write(.{ col, 'G' });
+        self.escape(.{ col, 'G' });
+    }
+
+    pub fn cursorVisible(self: *Terminal, show: bool) void {
+        if (show) {
+            self.write("\x1b[?25h");
+        } else self.write("\x1b[?25l");
     }
 
     pub fn sgr(self: *Terminal, code: SGRAttribute) void {
-        self.write(.{ @intFromEnum(code), 'm' });
+        self.escape(.{ @intFromEnum(code), 'm' });
     }
 
     const WinSize = struct {

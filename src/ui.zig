@@ -114,12 +114,12 @@ inline fn drawCandidate(
     const str = graphemeWidthSlice(candidate.str, @min(width - @as(usize, if (selected) 2 else 0), str_width));
 
     if (selected) {
-        terminal.writeBytes("* ");
+        terminal.write("* ");
     }
 
     // no highlights, just output the string
     if (matches.len == 0 or terminal.no_color) {
-        _ = terminal.writeBytes(str);
+        _ = terminal.write(str);
     } else {
         var slicer = HighlightSlicer.init(str, matches);
         while (slicer.next()) |slice| {
@@ -128,7 +128,7 @@ inline fn drawCandidate(
             } else {
                 terminal.sgr(.default);
             }
-            terminal.writeBytes(slice.str);
+            terminal.write(slice.str);
         }
     }
 }
@@ -146,13 +146,14 @@ fn draw(
     total_candidates: usize,
     plain: bool,
 ) !void {
+    terminal.cursorVisible(false);
     const width = terminal.windowSize().?.x;
 
     // draw the candidates
     var line: usize = 0;
     while (line < terminal.height) : (line += 1) {
         terminal.cursorDown(1);
-        terminal.clearLine();
+        terminal.cursorCol(0);
         if (line < candidates.len) drawCandidate(
             terminal,
             candidates[line + state.offset],
@@ -163,6 +164,7 @@ fn draw(
             state.case_sensitive,
             plain,
         );
+        terminal.clearToEndOfLine();
     }
     terminal.sgr(.reset);
     terminal.cursorUp(terminal.height);
@@ -188,14 +190,16 @@ fn draw(
     // draw the prompt
     // TODO: handle display of queries longer than the screen width
     const query_width = try dw.strWidth(state.query.slice(), .half);
-    terminal.print("{s}{s}", .{ state.prompt, graphemeWidthSlice(state.query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)) });
+    terminal.write(state.prompt);
+    terminal.write(graphemeWidthSlice(state.query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)));
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
     const cursor_width = try dw.strWidth(state.query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, state.query.cursor)), .half);
     terminal.cursorRight(@min(width - 1, cursor_width + state.prompt_width));
 
-    try terminal.writer.flush();
+    terminal.cursorVisible(true);
+    terminal.flush();
 }
 
 const Action = union(enum) {
