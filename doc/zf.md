@@ -16,7 +16,9 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 ## OPTIONS
 
-`-f, --filter` : Skip interactive use and filter using the given query
+`-d, --delimiter`: Set the delimiter used to split candidates (default \n)
+
+`-f, --filter`: Skip interactive use and filter using the given query
 
 `-k, --keep-order`: Don't sort by rank and preserve order of lines read on stdin. This makes zf remove any lines that don't match, but the order of lines will not change.
 
