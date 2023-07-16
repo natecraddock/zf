@@ -130,12 +130,12 @@ Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries 
 For compatibility with system package managers, zf targets the latest stable release of Zig. The [`unstable`](https://github.com/natecraddock/zf/tree/unstable) branch is kept up to date with Zig master.
 
 ```
-git clone --recursive https://github.com/natecraddock/zf
+git clone https://github.com/natecraddock/zf
 cd zf
-zig build -Doptimize=ReleaseSafe -fsummary
+zig build -Doptimize=ReleaseSafe --summary all
 ```
 
-The executable will be created in `./zig-out/bin/zf`.
+The executable will be created in `./zig-out/bin/zf`. For debug builds omit `-Doptimize=ReleaseSafe`.
 
 ## Integrations
 
