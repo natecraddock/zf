@@ -147,7 +147,10 @@ fn draw(
     plain: bool,
 ) !void {
     terminal.cursorVisible(false);
+
     const width = terminal.windowSize().?.x;
+    const items_width: usize = @intFromFloat(@as(f64, @floatFromInt(width)) * 0.5);
+    const preview_width = width - items_width;
 
     // draw the candidates
     var line: usize = 0;
@@ -158,7 +161,7 @@ fn draw(
             terminal,
             candidates[line + state.offset],
             tokens,
-            width,
+            items_width,
             state.selected_rows.contains(line + state.offset),
             line == state.selected,
             state.case_sensitive,
@@ -175,12 +178,12 @@ fn draw(
     const stats_width = blk: {
         if (num_selected > 0) {
             const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
-            terminal.cursorRight(width - stats_width);
+            terminal.cursorRight(items_width - stats_width);
             terminal.print("{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
             break :blk stats_width;
         } else {
             const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-            terminal.cursorRight(width - stats_width);
+            terminal.cursorRight(items_width - stats_width);
             terminal.print("{}/{}", .{ candidates.len, total_candidates });
             break :blk stats_width;
         }
@@ -192,6 +195,24 @@ fn draw(
     const query_width = try dw.strWidth(state.query.slice(), .half);
     terminal.write(state.prompt);
     terminal.write(graphemeWidthSlice(state.query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)));
+
+    // draw a preview window if requested
+    if (state.preview) |*preview| {
+        var lines = preview.lines();
+
+        for (0..terminal.height + 1) |_| {
+            terminal.cursorCol(items_width + 2);
+            terminal.write("│ ");
+
+            if (lines.next()) |preview_line| {
+                terminal.write(preview_line[0..@min(preview_line.len, preview_width - 3)]);
+            }
+
+            terminal.cursorDown(1);
+        }
+    }
+    terminal.sgr(.reset);
+    terminal.cursorUp(terminal.height + 1);
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
@@ -389,7 +410,9 @@ pub fn run(
         // The selection changed and the child process should be respawned
         if (state.selection_changed and state.preview != null) {
             state.selection_changed = false;
-            try state.preview.?.spawn(filtered[state.selected + state.offset].str);
+            if (filtered.len > 0) {
+                try state.preview.?.spawn(filtered[state.selected + state.offset].str);
+            }
         }
 
         if (state.redraw) {

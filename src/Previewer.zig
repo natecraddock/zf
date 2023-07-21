@@ -80,3 +80,7 @@ pub fn read(previewer: *Previewer) !void {
         }
     }
 }
+
+pub fn lines(previewer: *Previewer) std.mem.SplitIterator(u8, .scalar) {
+    return std.mem.splitScalar(u8, previewer.stdout.items, '\n');
+}
