@@ -69,6 +69,7 @@ pub const Terminal = struct {
 
         raw_termios.iflag &= ~@as(u32, system.ICRNL);
         raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO | system.ISIG);
+        raw_termios.cc[system.V.MIN] = 0;
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
@@ -81,12 +82,6 @@ pub const Terminal = struct {
             .highlight_color = highlight_color,
             .no_color = no_color,
         };
-    }
-
-    // TODO: remove this
-    pub fn nodelay(self: *Terminal, state: bool) void {
-        self.raw_termios.cc[system.V.MIN] = if (state) 0 else 1;
-        std.os.tcsetattr(self.tty.handle, .NOW, self.raw_termios) catch unreachable;
     }
 
     pub fn deinit(self: *Terminal) !void {

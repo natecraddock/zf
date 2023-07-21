@@ -311,7 +311,6 @@ pub fn main() anyerror!void {
         } else |_| .cyan;
 
         var terminal = try Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
-        terminal.nodelay(true);
         var selected = ui.run(
             allocator,
             &terminal,
