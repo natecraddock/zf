@@ -22,8 +22,9 @@ const help =
     \\
     \\-d, --delimiter=DELIMITER  Set the delimiter used to split candidates (default \n)
     \\-f, --filter               Skip interactive use and filter using the given query
+    \\    --height=HEIGHT        The height of the interface in rows (default 10)
     \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
-    \\-l, --lines=LINES          Set the maximum number of result lines to show (default 10)
+    \\-l, --lines=LINES          Alias of --height (deprecated)
     \\-p, --plain                Treat input as plaintext and disable filepath matching features
     \\    --preview=COMMAND      Execute COMMAND for the selected line and display the output in a preview window
     \\-v, --version              Show version information and exit
@@ -35,7 +36,7 @@ const Config = struct {
     version: bool = false,
     skip_ui: bool = false,
     keep_order: bool = false,
-    lines: usize = 10,
+    height: usize = 10,
     plain: bool = false,
     query: []u8 = undefined,
     delimiter: []const u8 = "\n",
@@ -69,7 +70,7 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
             config.keep_order = true;
         } else if (eql(u8, arg, "-p") or eql(u8, arg, "--plain")) {
             config.plain = true;
-        } else if (eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
+        } else if (eql(u8, arg, "--height") or eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
             if (index + 1 > args.len - 1) {
                 config.err = true;
                 config.err_str = try std.fmt.allocPrint(
@@ -80,8 +81,8 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
                 return config;
             }
 
-            config.lines = try std.fmt.parseUnsigned(usize, args[index + 1], 10);
-            if (config.lines == 0) return error.InvalidCharacter;
+            config.height = try std.fmt.parseUnsigned(usize, args[index + 1], 10);
+            if (config.height < 2) return error.InvalidCharacter;
             skip = true;
         } else if (eql(u8, arg, "-f") or eql(u8, arg, "--filter")) {
             config.skip_ui = true;
@@ -186,7 +187,7 @@ test "parse args" {
     {
         const args = [_][]const u8{ "zf", "-l", "12" };
         const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .lines = 12 };
+        const expected: Config = .{ .height = 12 };
         try testing.expectEqual(expected, config);
     }
     {
@@ -222,7 +223,7 @@ test "parse args" {
         try testing.expect(config.err);
     }
     {
-        const args = [_][]const u8{ "zf", "--lines", "-10" };
+        const args = [_][]const u8{ "zf", "--height", "-10" };
         try testing.expectError(error.InvalidCharacter, parseArgs(testing.allocator, &args));
     }
 }
@@ -240,7 +241,7 @@ pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
     const config = parseArgs(allocator, args) catch |e| switch (e) {
         error.InvalidCharacter, error.Overflow => {
-            try stderr.print("Number of lines must be an integer greater than 0\n", .{});
+            try stderr.print("Height must be an integer greater than 1\n", .{});
             std.process.exit(2);
         },
         else => return e,
@@ -310,7 +311,7 @@ pub fn main() anyerror!void {
             break :blk .cyan;
         } else |_| .cyan;
 
-        var terminal = try Terminal.init(@min(candidates.len, config.lines), highlight_color, no_color);
+        var terminal = try Terminal.init(@min(candidates.len, config.height), highlight_color, no_color);
         var selected = ui.run(
             allocator,
             &terminal,

@@ -20,9 +20,11 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 `-f, --filter`: Skip interactive use and filter using the given query
 
+`    --height`: The height of the interface in rows (default 10)
+
 `-k, --keep-order`: Don't sort by rank and preserve order of lines read on stdin. This makes zf remove any lines that don't match, but the order of lines will not change.
 
-`-l, --lines`: Set the maximum number of result lines to show. Defaults to 10. Will be clamped to the number of candidates or the height of the terminal, whichever is greater. Set to a large number (like 1000) to display zf full screen.
+`-l, --lines`: Alias of `--height`. Deprecated and will be removed in version 1.0.0.
 
 `-p, --plain`: Treat input as plaintext and disable filepath matching features. Useful when the input lines are not file paths.
 
