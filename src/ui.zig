@@ -215,6 +215,10 @@ fn draw(
         }
     }
     terminal.sgr(.reset);
+
+    // Clear any leftover rows (after a potential resize)
+    terminal.cursorCol(0);
+    terminal.clearToEndOfDisplay();
     terminal.cursorUp(height);
 
     // position the cursor at the edit location

@@ -141,6 +141,10 @@ pub const Terminal = struct {
         self.escape(.{ 0, 'K' });
     }
 
+    pub fn clearToEndOfDisplay(self: *Terminal) void {
+        self.escape(.{ 0, 'J' });
+    }
+
     pub fn scrollDown(self: *Terminal, num: usize) void {
         var i: usize = 0;
         while (i < num) : (i += 1) {
