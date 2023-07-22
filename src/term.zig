@@ -50,8 +50,8 @@ pub const Terminal = struct {
     termios: std.os.termios,
     raw_termios: std.os.termios,
 
+    width: usize = undefined,
     height: usize = undefined,
-    max_height: usize,
 
     no_color: bool,
     highlight_color: SGRAttribute,
@@ -60,7 +60,7 @@ pub const Terminal = struct {
     buffer: [4096]u8 = undefined,
     index: usize = 0,
 
-    pub fn init(max_height: usize, highlight_color: SGRAttribute, no_color: bool) !Terminal {
+    pub fn init(highlight_color: SGRAttribute, no_color: bool) !Terminal {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
 
         // store original terminal settings to restore later
@@ -73,35 +73,34 @@ pub const Terminal = struct {
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
-        return Terminal{
+        var term = Terminal{
             .tty = tty,
             .writer = tty.writer(),
             .termios = termios,
             .raw_termios = raw_termios,
-            .max_height = max_height,
             .highlight_color = highlight_color,
             .no_color = no_color,
         };
+        term.getSize();
+
+        return term;
     }
 
-    pub fn deinit(self: *Terminal) !void {
+    pub fn deinit(self: *Terminal, max_height: usize) !void {
+        const height = @min(self.height, max_height);
+
         var i: usize = 0;
-        while (i < self.height) : (i += 1) {
+        while (i < height) : (i += 1) {
             self.clearLine();
             self.cursorDown(1);
         }
         self.clearLine();
-        self.cursorUp(self.height);
+        self.cursorUp(height);
 
         self.flush();
 
         std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
-    }
-
-    pub fn determineHeight(self: *Terminal) void {
-        const win_size = self.windowSize();
-        self.height = std.math.clamp(self.max_height, 1, win_size.?.y - 1);
     }
 
     /// Buffered write interface
@@ -180,19 +179,11 @@ pub const Terminal = struct {
         self.escape(.{ @intFromEnum(code), 'm' });
     }
 
-    const WinSize = struct {
-        x: usize,
-        y: usize,
-    };
-
-    pub fn windowSize(self: *Terminal) ?WinSize {
+    pub fn getSize(self: *Terminal) void {
         var size: system.winsize = undefined;
-
-        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @intFromPtr(&size)) == -1) {
-            return null;
-        }
-
-        return WinSize{ .x = size.ws_col, .y = size.ws_row };
+        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @intFromPtr(&size)) == -1) unreachable;
+        self.width = size.ws_col;
+        self.height = size.ws_row;
     }
 
     // NOTE: this function assumes the input is either a stream of printable/whitespace

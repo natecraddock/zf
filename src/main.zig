@@ -311,7 +311,7 @@ pub fn main() anyerror!void {
             break :blk .cyan;
         } else |_| .cyan;
 
-        var terminal = try Terminal.init(@min(candidates.len, config.height), highlight_color, no_color);
+        var terminal = try Terminal.init(highlight_color, no_color);
         var selected = ui.run(
             allocator,
             &terminal,
@@ -319,6 +319,7 @@ pub fn main() anyerror!void {
             candidates,
             config.keep_order,
             config.plain,
+            config.height,
             config.preview,
             prompt_str,
             vi_mode,
@@ -330,7 +331,7 @@ pub fn main() anyerror!void {
             else => return err,
         };
 
-        try terminal.deinit();
+        try terminal.deinit(config.height);
 
         if (selected) |selected_lines| {
             for (selected_lines) |str| {

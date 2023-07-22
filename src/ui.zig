@@ -18,6 +18,7 @@ const Terminal = term.Terminal;
 const sep = std.fs.path.sep;
 
 const State = struct {
+    max_height: usize,
     selected: usize = 0,
     selected_rows: ArrayToggleSet(usize),
     offset: usize = 0,
@@ -148,13 +149,15 @@ fn draw(
 ) !void {
     terminal.cursorVisible(false);
 
-    const width = terminal.windowSize().?.x;
+    const width = terminal.width;
     const items_width: usize = @intFromFloat(@as(f64, @floatFromInt(width)) * 0.5);
     const preview_width = width - items_width;
 
+    const height = @min(terminal.height, state.max_height);
+
     // draw the candidates
     var line: usize = 0;
-    while (line < terminal.height) : (line += 1) {
+    while (line < height - 1) : (line += 1) {
         terminal.cursorDown(1);
         terminal.cursorCol(0);
         if (line < candidates.len) drawCandidate(
@@ -170,7 +173,7 @@ fn draw(
         terminal.clearToEndOfLine();
     }
     terminal.sgr(.reset);
-    terminal.cursorUp(terminal.height);
+    terminal.cursorUp(height - 1);
     terminal.clearLine();
 
     // draw the stats
@@ -200,7 +203,7 @@ fn draw(
     if (state.preview) |*preview| {
         var lines = preview.lines();
 
-        for (0..terminal.height + 1) |_| {
+        for (0..height) |_| {
             terminal.cursorCol(items_width + 2);
             terminal.write("│ ");
 
@@ -212,7 +215,7 @@ fn draw(
         }
     }
     terminal.sgr(.reset);
-    terminal.cursorUp(terminal.height + 1);
+    terminal.cursorUp(height);
 
     // position the cursor at the edit location
     terminal.cursorCol(0);
@@ -357,16 +360,11 @@ pub fn run(
     candidates: [][]const u8,
     keep_order: bool,
     plain: bool,
+    height: usize,
     preview_cmd: ?[]const u8,
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const []const u8 {
-    // ensure enough room to draw all lines of output by drawing blank lines,
-    // effectively scrolling the view. + 1 to also include the prompt's offset
-    terminal.determineHeight();
-    terminal.scrollDown(terminal.height);
-    terminal.cursorUp(terminal.height);
-
     var filtered = blk: {
         var filtered = try ArrayList(Candidate).initCapacity(allocator, candidates.len);
         for (candidates) |candidate| {
@@ -377,6 +375,7 @@ pub fn run(
     var filtered_buf = try allocator.alloc(Candidate, candidates.len);
 
     var state = State{
+        .max_height = height,
         .selected = 0,
         .selected_rows = ArrayToggleSet(usize).init(allocator),
         .offset = 0,
@@ -391,6 +390,13 @@ pub fn run(
     var loop = try Loop.init(terminal.tty.handle);
     if (preview_cmd) |cmd| {
         state.preview = try Previewer.init(allocator, &loop, cmd, filtered[0].str);
+    }
+
+    // ensure enough room to draw the ui by drawing blank lines which scrolls the view
+    {
+        const h = @min(terminal.height, height);
+        terminal.scrollDown(h);
+        terminal.cursorUp(h);
     }
 
     while (true) {
@@ -422,7 +428,10 @@ pub fn run(
 
         const event = loop.wait();
         switch (event) {
-            .resize => state.redraw = true,
+            .resize => {
+                terminal.getSize();
+                state.redraw = true;
+            },
             .tty => {
                 if (try handleInput(allocator, terminal, &state, filtered, vi_mode)) |selected| {
                     if (selected.len == 0) return null else return selected;
@@ -449,7 +458,7 @@ fn handleInput(allocator: Allocator, terminal: *Terminal, state: *State, filtere
     const last_selected = state.selected;
     const last_offset = state.offset;
 
-    const visible_rows = @min(terminal.height, filtered.len);
+    const visible_rows = @min(@min(state.max_height, terminal.height) - 1, filtered.len);
 
     switch (action) {
         .str => |str| try query.insert(str),
