@@ -1,18 +1,20 @@
-const eql = std.mem.eql;
+const args = @import("args.zig");
+const filter = @import("filter.zig");
 const heap = std.heap;
 const io = std.io;
 const std = @import("std");
+const term = @import("term.zig");
 const testing = std.testing;
+const ui = @import("ui.zig");
 const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
 const Normalizer = ziglyph.Normalizer;
+const Parser = @import("args.zig").Parser;
 const SGRAttribute = term.SGRAttribute;
 const Terminal = term.Terminal;
 
-const filter = @import("filter.zig");
-const term = @import("term.zig");
-const ui = @import("ui.zig");
+const eql = std.mem.eql;
 
 const version = "0.9.0-dev";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
@@ -20,213 +22,17 @@ const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 const help =
     \\Usage: zf [options]
     \\
-    \\-d, --delimiter=DELIMITER  Set the delimiter used to split candidates (default \n)
+    \\-d, --delimiter DELIMITER  Set the delimiter used to split candidates (default \n)
     \\-f, --filter               Skip interactive use and filter using the given query
-    \\    --height=HEIGHT        The height of the interface in rows (default 10)
+    \\    --height HEIGHT        The height of the interface in rows (default 10)
     \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
-    \\-l, --lines=LINES          Alias of --height (deprecated)
+    \\-l, --lines LINES          Alias of --height (deprecated)
     \\-p, --plain                Treat input as plaintext and disable filepath matching features
-    \\    --preview=COMMAND      Execute COMMAND for the selected line and display the output in a preview window
+    \\    --preview COMMAND      Execute COMMAND for the selected line and display the output in a seprate column
+    \\    --preview-width WIDTH  Set the preview column width (default 60%)
     \\-v, --version              Show version information and exit
     \\-h, --help                 Display this help and exit
 ;
-
-const Config = struct {
-    help: bool = false,
-    version: bool = false,
-    skip_ui: bool = false,
-    keep_order: bool = false,
-    height: usize = 10,
-    plain: bool = false,
-    query: []u8 = undefined,
-    delimiter: []const u8 = "\n",
-    preview: ?[]const u8 = null,
-
-    // HACK: error unions cannot return a value, so return error messages in
-    // the config struct instead
-    err: bool = false,
-    err_str: []u8 = undefined,
-};
-
-// TODO: handle args immediately after a short arg, i.e. -qhello or -l5
-fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !Config {
-    var config: Config = .{};
-
-    var skip = false;
-    for (args[1..], 0..) |arg, i| {
-        if (skip) {
-            skip = false;
-            continue;
-        }
-
-        const index = i + 1;
-        if (eql(u8, arg, "-h") or eql(u8, arg, "--help")) {
-            config.help = true;
-            return config;
-        } else if (eql(u8, arg, "-v") or eql(u8, arg, "--version")) {
-            config.version = true;
-            return config;
-        } else if (eql(u8, arg, "-k") or eql(u8, arg, "--keep-order")) {
-            config.keep_order = true;
-        } else if (eql(u8, arg, "-p") or eql(u8, arg, "--plain")) {
-            config.plain = true;
-        } else if (eql(u8, arg, "--height") or eql(u8, arg, "-l") or eql(u8, arg, "--lines")) {
-            if (index + 1 > args.len - 1) {
-                config.err = true;
-                config.err_str = try std.fmt.allocPrint(
-                    allocator,
-                    "zf: option '{s}' requires an argument\n{s}",
-                    .{ arg, help },
-                );
-                return config;
-            }
-
-            config.height = try std.fmt.parseUnsigned(usize, args[index + 1], 10);
-            if (config.height < 2) return error.InvalidCharacter;
-            skip = true;
-        } else if (eql(u8, arg, "-f") or eql(u8, arg, "--filter")) {
-            config.skip_ui = true;
-
-            // read query
-            if (index + 1 > args.len - 1) {
-                config.err = true;
-                config.err_str = try std.fmt.allocPrint(
-                    allocator,
-                    "zf: option '{s}' requires an argument\n{s}",
-                    .{ arg, help },
-                );
-                return config;
-            }
-
-            config.query = try allocator.alloc(u8, args[index + 1].len);
-            std.mem.copy(u8, config.query, args[index + 1]);
-            skip = true;
-        } else if (eql(u8, arg, "-d") or eql(u8, arg, "--delimiter")) {
-            if (index + 1 > args.len - 1) {
-                config.err = true;
-                config.err_str = try std.fmt.allocPrint(
-                    allocator,
-                    "zf: option '{s}' requires an argument\n{s}",
-                    .{ arg, help },
-                );
-                return config;
-            }
-
-            config.delimiter = args[index + 1];
-            if (config.delimiter.len == 0) {
-                config.err = true;
-                config.err_str = try std.fmt.allocPrint(
-                    allocator,
-                    "zf: delimiter cannot be empty\n{s}",
-                    .{help},
-                );
-                return config;
-            }
-
-            skip = true;
-        } else if (eql(u8, arg, "--preview")) {
-            if (index + 1 > args.len - 1) {
-                config.err = true;
-                config.err_str = try std.fmt.allocPrint(
-                    allocator,
-                    "zf: option '{s}' requires an argument\n{s}",
-                    .{ arg, help },
-                );
-                return config;
-            }
-
-            config.preview = try allocator.dupe(u8, args[index + 1]);
-            skip = true;
-        } else {
-            config.err = true;
-            config.err_str = try std.fmt.allocPrint(
-                allocator,
-                "zf: unrecognized option '{s}'\n{s}",
-                .{ arg, help },
-            );
-            return config;
-        }
-    }
-
-    return config;
-}
-
-test "parse args" {
-    {
-        const args = [_][]const u8{"zf"};
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{};
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "--help" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .help = true };
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "--version" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .version = true };
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "-v", "-h" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .help = false, .version = true };
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "-f", "query" };
-        const config = try parseArgs(testing.allocator, &args);
-        defer testing.allocator.free(config.query);
-
-        try testing.expect(config.skip_ui);
-        try testing.expectEqualStrings("query", config.query);
-    }
-    {
-        const args = [_][]const u8{ "zf", "-l", "12" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .height = 12 };
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "-k", "-p" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .keep_order = true, .plain = true };
-        try testing.expectEqual(expected, config);
-    }
-    {
-        const args = [_][]const u8{ "zf", "--keep-order", "--plain" };
-        const config = try parseArgs(testing.allocator, &args);
-        const expected: Config = .{ .keep_order = true, .plain = true };
-        try testing.expectEqual(expected, config);
-    }
-
-    // failure cases
-    {
-        const args = [_][]const u8{ "zf", "--filter" };
-        const config = try parseArgs(testing.allocator, &args);
-        defer testing.allocator.free(config.err_str);
-        try testing.expect(config.err);
-    }
-    {
-        const args = [_][]const u8{ "zf", "asdf" };
-        const config = try parseArgs(testing.allocator, &args);
-        defer testing.allocator.free(config.err_str);
-        try testing.expect(config.err);
-    }
-    {
-        const args = [_][]const u8{ "zf", "bad arg here", "--help" };
-        const config = try parseArgs(testing.allocator, &args);
-        defer testing.allocator.free(config.err_str);
-        try testing.expect(config.err);
-    }
-    {
-        const args = [_][]const u8{ "zf", "--height", "-10" };
-        try testing.expectError(error.InvalidCharacter, parseArgs(testing.allocator, &args));
-    }
-}
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating
@@ -238,8 +44,8 @@ pub fn main() anyerror!void {
     const stderr = std.io.getStdErr().writer();
     const allocator = arena.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
-    const config = parseArgs(allocator, args) catch |e| switch (e) {
+    const arguments = try std.process.argsAlloc(allocator);
+    const config = args.parse(allocator, arguments) catch |e| switch (e) {
         error.InvalidCharacter, error.Overflow => {
             try stderr.print("Height must be an integer greater than 1\n", .{});
             std.process.exit(2);
