@@ -29,6 +29,7 @@ const State = struct {
     case_sensitive: bool = false,
     selection_changed: bool = false,
     preview: ?Previewer = null,
+    preview_width: f64 = 0.6,
 };
 
 const HighlightSlicer = struct {
@@ -150,8 +151,8 @@ fn draw(
     terminal.cursorVisible(false);
 
     const width = terminal.width;
-    const items_width: usize = @intFromFloat(@as(f64, @floatFromInt(width)) * 0.5);
-    const preview_width = width - items_width;
+    const preview_width: usize = @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width);
+    const items_width = width - preview_width;
 
     const height = @min(terminal.height, state.max_height);
 
@@ -366,6 +367,7 @@ pub fn run(
     plain: bool,
     height: usize,
     preview_cmd: ?[]const u8,
+    preview_width: f64,
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const []const u8 {
@@ -394,6 +396,7 @@ pub fn run(
     var loop = try Loop.init(terminal.tty.handle);
     if (preview_cmd) |cmd| {
         state.preview = try Previewer.init(allocator, &loop, cmd, filtered[0].str);
+        state.preview_width = preview_width;
     }
 
     // ensure enough room to draw the ui by drawing blank lines which scrolls the view

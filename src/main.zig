@@ -1,7 +1,7 @@
-const args = @import("args.zig");
 const filter = @import("filter.zig");
 const heap = std.heap;
 const io = std.io;
+const opts = @import("opts.zig");
 const std = @import("std");
 const term = @import("term.zig");
 const testing = std.testing;
@@ -10,29 +10,10 @@ const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
 const Normalizer = ziglyph.Normalizer;
-const Parser = @import("args.zig").Parser;
 const SGRAttribute = term.SGRAttribute;
 const Terminal = term.Terminal;
 
 const eql = std.mem.eql;
-
-const version = "0.9.0-dev";
-const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
-
-const help =
-    \\Usage: zf [options]
-    \\
-    \\-d, --delimiter DELIMITER  Set the delimiter used to split candidates (default \n)
-    \\-f, --filter               Skip interactive use and filter using the given query
-    \\    --height HEIGHT        The height of the interface in rows (default 10)
-    \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
-    \\-l, --lines LINES          Alias of --height (deprecated)
-    \\-p, --plain                Treat input as plaintext and disable filepath matching features
-    \\    --preview COMMAND      Execute COMMAND for the selected line and display the output in a seprate column
-    \\    --preview-width WIDTH  Set the preview column width (default 60%)
-    \\-v, --version              Show version information and exit
-    \\-h, --help                 Display this help and exit
-;
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating
@@ -44,25 +25,8 @@ pub fn main() anyerror!void {
     const stderr = std.io.getStdErr().writer();
     const allocator = arena.allocator();
 
-    const arguments = try std.process.argsAlloc(allocator);
-    const config = args.parse(allocator, arguments) catch |e| switch (e) {
-        error.InvalidCharacter, error.Overflow => {
-            try stderr.print("Height must be an integer greater than 1\n", .{});
-            std.process.exit(2);
-        },
-        else => return e,
-    };
-
-    if (config.err) {
-        try stderr.print("{s}\n", .{config.err_str});
-        std.process.exit(2);
-    } else if (config.help) {
-        try stdout.print("{s}\n", .{help});
-        std.process.exit(0);
-    } else if (config.version) {
-        try stdout.print("{s}\n", .{version_str});
-        std.process.exit(0);
-    }
+    const args = try std.process.argsAlloc(allocator);
+    const config = opts.parse(allocator, args, stderr);
 
     var normalizer = try Normalizer.init(allocator);
     defer normalizer.deinit();
@@ -88,12 +52,12 @@ pub fn main() anyerror!void {
     var candidates = try filter.collectCandidates(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 
-    if (config.skip_ui) {
+    if (config.filter) |query| {
         // Use the heap here rather than an array on the stack. Testing showed that this is actually
         // faster, likely due to locality with other heap-alloced data used in the algorithm.
         var tokens_buf = try allocator.alloc([]const u8, 16);
-        const tokens = ui.splitQuery(tokens_buf, config.query);
-        const case_sensitive = ui.hasUpper(config.query);
+        const tokens = ui.splitQuery(tokens_buf, query);
+        const case_sensitive = ui.hasUpper(query);
         var filtered_buf = try allocator.alloc(filter.Candidate, candidates.len);
         const filtered = filter.rankCandidates(filtered_buf, candidates, tokens, config.keep_order, config.plain, case_sensitive);
         if (filtered.len == 0) std.process.exit(1);
@@ -127,6 +91,7 @@ pub fn main() anyerror!void {
             config.plain,
             config.height,
             config.preview,
+            config.preview_width,
             prompt_str,
             vi_mode,
         ) catch |err| switch (err) {
