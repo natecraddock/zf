@@ -143,5 +143,6 @@ test {
     _ = @import("EditBuffer.zig");
     _ = @import("filter.zig");
     _ = @import("lib.zig");
+    _ = @import("opts.zig");
     _ = @import("ui.zig");
 }

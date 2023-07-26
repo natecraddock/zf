@@ -45,6 +45,7 @@ const OptionIter = struct {
 
         const arg = self.args[self.index];
         if (mem.startsWith(u8, arg, "--") and arg.len > 2) {
+            self.index += 1;
             return arg[2..];
         } else if (mem.startsWith(u8, arg, "-") and arg.len > 1) {
             self.short_index = 1;
@@ -72,14 +73,14 @@ const OptionIter = struct {
         // when parsing multiple short args the argument can be joined without a space
         if (self.short_index) |index| {
             const arg = self.args[self.index];
+            self.short_index = null;
             if (index < arg.len - 1) {
                 self.index += 1;
-                self.short_index = null;
                 return arg[index..];
             }
+            self.index += 1;
         }
 
-        self.index += 1;
         if (self.index >= self.args.len) return null;
 
         const arg = self.args[self.index];
@@ -188,4 +189,75 @@ fn missingArg(stderr: File.Writer, iter: OptionIter, opt: []const u8) noreturn {
 fn argError(stderr: File.Writer, err: []const u8) noreturn {
     stderr.print("zf: {s}\n{s}", .{ err, help }) catch unreachable;
     process.exit(2);
+}
+
+const testing = std.testing;
+const expectEqualStrings = testing.expectEqualStrings;
+
+test "OptionIter" {
+    // short option
+    {
+        var iter: OptionIter = .{ .args = &.{"-h"} };
+        try expectEqualStrings("h", iter.next().?);
+    }
+
+    // chained short options
+    {
+        var iter: OptionIter = .{ .args = &.{"-abcd"} };
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("b", iter.next().?);
+        try expectEqualStrings("c", iter.next().?);
+        try expectEqualStrings("d", iter.next().?);
+    }
+
+    // chained short options with connected argument
+    {
+        var iter: OptionIter = .{ .args = &.{"-afargument"} };
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("f", iter.next().?);
+        try expectEqualStrings("argument", iter.getArg().?);
+    }
+
+    // chained short options with argument
+    {
+        var iter: OptionIter = .{ .args = &.{"-af", "argument"} };
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("f", iter.next().?);
+        try expectEqualStrings("argument", iter.getArg().?);
+    }
+
+    // long option
+    {
+        var iter: OptionIter = .{ .args = &.{"--help"} };
+        try expectEqualStrings("help", iter.next().?);
+    }
+
+    // long option with argument
+    {
+        var iter: OptionIter = .{ .args = &.{"--filter", "argument"} };
+        try expectEqualStrings("filter", iter.next().?);
+        try expectEqualStrings("argument", iter.getArg().?);
+    }
+
+    // mixed
+    {
+        var iter: OptionIter = .{ .args = &.{"-a", "arg", "--long", "-sbarg", "--long", "-abcopt", "-a", "opt", "--long", "--flag", "opt" } };
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("arg", iter.getArg().?);
+        try expectEqualStrings("long", iter.next().?);
+        try expectEqualStrings("s", iter.next().?);
+        try expectEqualStrings("b", iter.next().?);
+        try expectEqualStrings("arg", iter.getArg().?);
+        try expectEqualStrings("long", iter.next().?);
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("b", iter.next().?);
+        try expectEqualStrings("c", iter.next().?);
+        try expectEqualStrings("opt", iter.getArg().?);
+        try expectEqualStrings("a", iter.next().?);
+        try expectEqualStrings("opt", iter.getArg().?);
+        try expectEqualStrings("long", iter.next().?);
+        try expectEqualStrings("flag", iter.next().?);
+        try expectEqualStrings("opt", iter.getArg().?);
+        try testing.expect(iter.next() == null);
+    }
 }
