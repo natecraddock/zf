@@ -151,7 +151,11 @@ fn draw(
     terminal.cursorVisible(false);
 
     const width = terminal.width;
-    const preview_width: usize = @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width);
+    const preview_width: usize = if (state.preview) |_|
+        @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
+    else
+        0;
+
     const items_width = width - preview_width;
 
     const height = @min(terminal.height, state.max_height);
@@ -214,8 +218,8 @@ fn draw(
 
             terminal.cursorDown(1);
         }
-    }
-    terminal.sgr(.reset);
+        terminal.sgr(.reset);
+    } else terminal.cursorDown(height);
 
     // Clear any leftover rows (after a potential resize)
     terminal.cursorCol(0);
