@@ -49,7 +49,7 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
         _ = try child.kill();
     }
 
-    const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s}", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
+    const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s} | expand -t4", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
 
     var child = Child.init(&.{ previewer.shell, "-c", command }, previewer.allocator);
     child.stdin_behavior = .Close;
