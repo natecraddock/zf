@@ -108,13 +108,13 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
     while (iter.next()) |opt| {
         // help
         if (mem.eql(u8, opt, "h") or mem.eql(u8, opt, "help")) {
-            stderr.writeAll(help) catch unreachable;
+            stderr.print("{s}\n", .{help}) catch unreachable;
             process.exit(0);
         }
 
         // version
         else if (mem.eql(u8, opt, "v") or mem.eql(u8, opt, "version")) {
-            stderr.writeAll(version_str) catch unreachable;
+            stderr.print("{s}\n", .{version_str}) catch unreachable;
             process.exit(0);
         }
 
@@ -162,15 +162,15 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
                 if (mem.endsWith(u8, arg, "%")) break :blk arg[0 .. arg.len - 1];
                 break :blk arg;
             };
-            const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "width must be an integer");
-            if (preview_width < 20 or preview_width > 80) argError(stderr, "width must be between 20% and 80%");
+            const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "preview-width must be an integer");
+            if (preview_width < 20 or preview_width > 80) argError(stderr, "preview-width must be between 20% and 80%");
 
             config.preview_width = @as(f64, @floatFromInt(preview_width)) / 100.0;
         }
 
         // invalid option
         else {
-            stderr.print("zf: unrecognized option '{s}{s}'\n{s}", .{ if (iter.short_index != null) "-" else "--", opt, help }) catch unreachable;
+            stderr.print("zf: unrecognized option '{s}{s}'\n{s}\n", .{ if (iter.short_index != null) "-" else "--", opt, help }) catch unreachable;
             process.exit(2);
         }
     }
@@ -180,14 +180,14 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
 
 fn missingArg(stderr: File.Writer, iter: OptionIter, opt: []const u8) noreturn {
     stderr.print(
-        "zf: option '{s}{s}' requires an argument\n{s}",
+        "zf: option '{s}{s}' requires an argument\n{s}\n",
         .{ if (iter.short_index != null) "-" else "--", opt, help },
     ) catch unreachable;
     process.exit(2);
 }
 
 fn argError(stderr: File.Writer, err: []const u8) noreturn {
-    stderr.print("zf: {s}\n{s}", .{ err, help }) catch unreachable;
+    stderr.print("zf: {s}\n{s}\n", .{ err, help }) catch unreachable;
     process.exit(2);
 }
 
@@ -220,7 +220,7 @@ test "OptionIter" {
 
     // chained short options with argument
     {
-        var iter: OptionIter = .{ .args = &.{"-af", "argument"} };
+        var iter: OptionIter = .{ .args = &.{ "-af", "argument" } };
         try expectEqualStrings("a", iter.next().?);
         try expectEqualStrings("f", iter.next().?);
         try expectEqualStrings("argument", iter.getArg().?);
@@ -234,14 +234,14 @@ test "OptionIter" {
 
     // long option with argument
     {
-        var iter: OptionIter = .{ .args = &.{"--filter", "argument"} };
+        var iter: OptionIter = .{ .args = &.{ "--filter", "argument" } };
         try expectEqualStrings("filter", iter.next().?);
         try expectEqualStrings("argument", iter.getArg().?);
     }
 
     // mixed
     {
-        var iter: OptionIter = .{ .args = &.{"-a", "arg", "--long", "-sbarg", "--long", "-abcopt", "-a", "opt", "--long", "--flag", "opt" } };
+        var iter: OptionIter = .{ .args = &.{ "-a", "arg", "--long", "-sbarg", "--long", "-abcopt", "-a", "opt", "--long", "--flag", "opt" } };
         try expectEqualStrings("a", iter.next().?);
         try expectEqualStrings("arg", iter.getArg().?);
         try expectEqualStrings("long", iter.next().?);

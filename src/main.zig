@@ -96,10 +96,14 @@ pub fn main() anyerror!void {
             vi_mode,
         ) catch |err| switch (err) {
             error.UnknownANSIEscape => {
-                try stderr.print("error: unknown ANSI escape sequence in ZF_PROMPT", .{});
+                try terminal.deinit(0);
+                try stderr.print("zf: unknown ANSI escape sequence in ZF_PROMPT\n", .{});
                 std.process.exit(2);
             },
-            else => return err,
+            else => {
+                try terminal.deinit(0);
+                return err;
+            },
         };
 
         try terminal.deinit(config.height);
