@@ -190,7 +190,7 @@ pub const Terminal = struct {
         self.height = size.ws_row;
     }
 
-    // NOTE: this function assumes the input is either a stream of printable/whitespace
+    // This function assumes the input is either a stream of printable/whitespace
     // codepoints, or a control sequence. I don't expect the input to zf to be a mixed
     // buffer. If that is the case this will need to be refactored.
     pub fn read(self: *Terminal, buf: []u8) !InputBuffer {
