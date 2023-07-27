@@ -74,7 +74,7 @@ const OptionIter = struct {
         if (self.short_index) |index| {
             const arg = self.args[self.index];
             self.short_index = null;
-            if (index < arg.len - 1) {
+            if (index < arg.len) {
                 self.index += 1;
                 return arg[index..];
             }
@@ -199,6 +199,13 @@ test "OptionIter" {
     {
         var iter: OptionIter = .{ .args = &.{"-h"} };
         try expectEqualStrings("h", iter.next().?);
+    }
+
+    // short option with argument
+    {
+        var iter: OptionIter = .{ .args = &.{"-fa"} };
+        try expectEqualStrings("f", iter.next().?);
+        try expectEqualStrings("a", iter.getArg().?);
     }
 
     // chained short options
