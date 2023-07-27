@@ -155,8 +155,7 @@ fn draw(
         @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
     else
         0;
-
-    const items_width = width - preview_width;
+    const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
 
     const height = @min(terminal.height, state.max_height);
 
@@ -213,7 +212,7 @@ fn draw(
             terminal.write("│ ");
 
             if (lines.next()) |preview_line| {
-                terminal.write(preview_line[0..@min(preview_line.len, preview_width - 3)]);
+                terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
             }
 
             terminal.cursorDown(1);
