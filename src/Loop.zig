@@ -11,8 +11,6 @@ const errno = os.errno;
 
 const Loop = @This();
 
-const SIG_BLOCK = if (builtin.os.tag == .macos) os.SIG._BLOCK else os.SIG.BLOCK;
-
 /// The file descriptor of the TTY
 ttyfd: os.fd_t,
 
@@ -35,7 +33,7 @@ pub fn init(ttyfd: os.fd_t) !Loop {
     // This will be unblocked by the kernel within the pselect() call.
     var sigset = os.system.empty_sigset;
     os.system.sigaddset(&sigset, os.SIG.WINCH);
-    _ = os.system.sigprocmask(SIG_BLOCK, &sigset, null);
+    _ = os.system.sigprocmask(os.SIG.BLOCK, &sigset, null);
 
     // Setup SIGWINCH signal handler
     var sigaction: os.Sigaction = .{
