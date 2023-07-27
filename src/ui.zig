@@ -448,10 +448,11 @@ pub fn run(
                 }
             },
             .child_out => {
-                try state.preview.?.read();
+                try state.preview.?.read(.stdout);
                 state.redraw = true;
             },
             .child_err => {
+                try state.preview.?.read(.stderr);
                 state.redraw = true;
             },
         }

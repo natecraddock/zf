@@ -62,15 +62,22 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
     previewer.child = child;
 }
 
-pub fn read(previewer: *Previewer) !void {
+pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !void {
     if (previewer.child) |*child| {
         var bytes_read: usize = 0;
         while (true) {
             var buf: [1024]u8 = undefined;
-            const len = try child.stdout.?.read(&buf);
+            const len = switch (stream) {
+                .stdout => try child.stdout.?.read(&buf),
+                .stderr => try child.stderr.?.read(&buf),
+            };
             bytes_read += len;
             if (len == 0) break;
-            try previewer.stdout.appendSlice(buf[0..len]);
+
+            switch (stream) {
+                .stdout => try previewer.stdout.appendSlice(buf[0..len]),
+                .stderr => try previewer.stderr.appendSlice(buf[0..len]),
+            }
         }
 
         if (bytes_read == 0) {
@@ -82,5 +89,8 @@ pub fn read(previewer: *Previewer) !void {
 }
 
 pub fn lines(previewer: *Previewer) std.mem.SplitIterator(u8, .scalar) {
+    if (previewer.stderr.items.len > 0) {
+        return std.mem.splitScalar(u8, previewer.stderr.items, '\n');
+    }
     return std.mem.splitScalar(u8, previewer.stdout.items, '\n');
 }
