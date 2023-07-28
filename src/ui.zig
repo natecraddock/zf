@@ -424,12 +424,12 @@ pub fn run(
         }
 
         // The selection changed and the child process should be respawned
-        if (state.selection_changed and state.preview != null) {
+        if (state.selection_changed) if (state.preview) |*preview| {
             state.selection_changed = false;
             if (filtered.len > 0) {
-                try state.preview.?.spawn(filtered[state.selected + state.offset].str);
-            }
-        }
+                try preview.spawn(filtered[state.selected + state.offset].str);
+            } else try preview.reset();
+        };
 
         if (state.redraw) {
             state.redraw = false;

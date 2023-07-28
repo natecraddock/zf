@@ -1,5 +1,6 @@
 //! Manages child processes used for previewing information about the selected line
 
+const mem = std.mem;
 const process = std.process;
 const std = @import("std");
 
@@ -15,6 +16,8 @@ loop: *Loop,
 
 shell: []const u8,
 cmd_parts: [2][]const u8,
+
+current_arg: []const u8 = "",
 
 child: ?Child = null,
 stdout: ArrayList(u8),
@@ -42,12 +45,21 @@ pub fn init(allocator: Allocator, loop: *Loop, cmd: []const u8, arg: []const u8)
     return previewer;
 }
 
-pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
+pub fn reset(previewer: *Previewer) !void {
     previewer.stdout.clearRetainingCapacity();
     previewer.stderr.clearRetainingCapacity();
     if (previewer.child) |*child| {
         _ = try child.kill();
     }
+}
+
+pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
+    // If the arg is already being previewed we don't need to do any work
+    if (mem.eql(u8, arg, previewer.current_arg)) {
+        return;
+    }
+
+    try previewer.reset();
 
     const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s} | expand -t4", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
 
@@ -58,8 +70,8 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
     try child.spawn();
 
     previewer.loop.setChild(child.stdout.?.handle, child.stderr.?.handle);
-
     previewer.child = child;
+    previewer.current_arg = try previewer.allocator.dupe(u8, arg);
 }
 
 pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !void {
