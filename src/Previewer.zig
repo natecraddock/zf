@@ -1,6 +1,7 @@
 //! Manages child processes used for previewing information about the selected line
 
 const mem = std.mem;
+const os = std.os;
 const process = std.process;
 const std = @import("std");
 
@@ -50,6 +51,7 @@ pub fn reset(previewer: *Previewer) !void {
     previewer.stderr.clearRetainingCapacity();
     if (previewer.child) |*child| {
         _ = try child.kill();
+        previewer.loop.clearChild();
     }
 }
 
@@ -69,35 +71,50 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
     child.stderr_behavior = .Pipe;
     try child.spawn();
 
+    _ = try os.fcntl(child.stdout.?.handle, os.F.SETFL, os.O.NONBLOCK);
+    _ = try os.fcntl(child.stderr.?.handle, os.F.SETFL, os.O.NONBLOCK);
+
     previewer.loop.setChild(child.stdout.?.handle, child.stderr.?.handle);
     previewer.child = child;
     previewer.current_arg = try previewer.allocator.dupe(u8, arg);
 }
 
-pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !void {
+pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !bool {
     if (previewer.child) |*child| {
-        var bytes_read: usize = 0;
-        while (true) {
-            var buf: [1024]u8 = undefined;
-            const len = switch (stream) {
-                .stdout => try child.stdout.?.read(&buf),
-                .stderr => try child.stderr.?.read(&buf),
-            };
-            bytes_read += len;
-            if (len == 0) break;
+        var buf: [4096]u8 = undefined;
+        const len = switch (stream) {
+            .stdout => child.stdout.?.read(&buf),
+            .stderr => child.stderr.?.read(&buf),
+        } catch |err| switch (err) {
+            error.WouldBlock => return false,
+            else => |e| return e,
+        };
 
-            switch (stream) {
-                .stdout => try previewer.stdout.appendSlice(buf[0..len]),
-                .stderr => try previewer.stderr.appendSlice(buf[0..len]),
-            }
+        if (len == 0) {
+            _ = try child.kill();
+            previewer.child = null;
+            previewer.loop.clearChild();
+            return false;
         }
 
-        if (bytes_read == 0) {
+        switch (stream) {
+            .stdout => try previewer.stdout.appendSlice(buf[0..len]),
+            .stderr => try previewer.stderr.appendSlice(buf[0..len]),
+        }
+
+        const buf_len = switch (stream) {
+            .stdout => previewer.stdout.items.len,
+            .stderr => previewer.stderr.items.len,
+        };
+
+        // limit the size of the preview buffer for now
+        if (buf_len > 4096 * 10) {
             _ = try child.kill();
             previewer.child = null;
             previewer.loop.clearChild();
         }
     }
+    return true;
 }
 
 pub fn lines(previewer: *Previewer) std.mem.SplitIterator(u8, .scalar) {
