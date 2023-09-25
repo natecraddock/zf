@@ -4,8 +4,8 @@
     .version = "0.9.0",
     .dependencies = .{
         .ziglyph = .{
-            .url = "https://github.com/jecolon/ziglyph/archive/1201bf393a9c8ae4e1564d01e4e4d9377e2c89de.tar.gz",
+            .url = "https://codeberg.org/dude_the_builder/ziglyph/archive/v0.11.1.tar.gz",
             .hash = "12203f350e5cd707acfc46980614c928e90b41f86cf2cbc926888293e6f5b63ad9f1",
-        }
+        },
     },
 }
