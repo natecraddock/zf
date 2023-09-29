@@ -18,9 +18,11 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 `-d, --delimiter`: Set the delimiter used to split candidates (default \n)
 
+`-0`: Shorthand for `-d'\0'` to split on null bytes
+
 `-f, --filter`: Skip interactive use and filter using the given query
 
-`    --height`: The height of the interface in rows (default 10)
+`--height`: The height of the interface in rows (default 10)
 
 `-k, --keep-order`: Don't sort by rank and preserve order of lines read on stdin. This makes zf remove any lines that don't match, but the order of lines will not change.
 

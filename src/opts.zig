@@ -15,6 +15,7 @@ const help =
     \\Usage: zf [options]
     \\
     \\-d, --delimiter DELIMITER  Set the delimiter used to split candidates (default \n)
+    \\-0                         Shorthand for -d'\0' to split on null bytes
     \\-f, --filter QUERY         Skip interactive use and filter using the given query
     \\    --height HEIGHT        The height of the interface in rows (default 10)
     \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
@@ -123,6 +124,9 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
             const delimiter = iter.getArg() orelse missingArg(stderr, iter, opt);
             if (delimiter.len == 0) argError(stderr, "delimiter cannot be empty");
             config.delimiter = allocator.dupe(u8, delimiter) catch unreachable;
+        }
+        else if (mem.eql(u8, opt, "0")) {
+            config.delimiter = allocator.dupe(u8, &.{ 0 }) catch unreachable;
         }
 
         // filter

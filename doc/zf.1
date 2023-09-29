@@ -31,11 +31,15 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 Set the delimiter used to split candidates (default \\n)
 .
 .TP
+.BR \-0
+Shorthand for -d'\\0' to split on null bytes
+.
+.TP
 .BR \-f ", " \-\-filter
 Skip interactive use and filter using the given query
 .
 .TP
-.BR "    " \-\-height
+.BR \-\-height
 The height of the interface in rows (default 10)
 .
 .TP
