@@ -21,6 +21,11 @@ And although this news is months old, zf is now available in [nix](https://searc
 
   zf now properly handles chained short options and short options immediately followed by an argument. Error handling and reporting is also improved.
 
+* **feat**: handle window resizes
+  ([c84872](https://github.com/natecraddock/zf/commit/c84872))
+
+  Properly clears overflowing lines when the terminal resizes.
+
 * **fix**: better buffered terminal writes for reduced flicker
   ([bfb8c2](https://github.com/natecraddock/zf/commit/bfb8c2))
 
