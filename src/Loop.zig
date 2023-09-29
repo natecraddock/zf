@@ -3,9 +3,13 @@
 //! Because pselect is difficult to call from Zig, a portion of the code is written in C.
 //! See loop.c for more details.
 
-const builtin = @import("builtin");
 const os = std.os;
 const std = @import("std");
+
+const c = switch(@import("builtin").os.tag) {
+    .linux => std.os.linux,
+    else => std.c,
+};
 
 const errno = os.errno;
 
@@ -31,14 +35,14 @@ fn handler(_: c_int) align(1) callconv(.C) void {}
 pub fn init(ttyfd: os.fd_t) !Loop {
     // Block handling of SIGWINCH.
     // This will be unblocked by the kernel within the pselect() call.
-    var sigset = os.system.empty_sigset;
-    os.system.sigaddset(&sigset, os.SIG.WINCH);
-    _ = os.system.sigprocmask(os.SIG.BLOCK, &sigset, null);
+    var sigset = c.empty_sigset;
+    c.sigaddset(&sigset, os.SIG.WINCH);
+    _ = c.sigprocmask(os.SIG.BLOCK, &sigset, null);
 
     // Setup SIGWINCH signal handler
     var sigaction: os.Sigaction = .{
         .handler = .{ .handler = handler },
-        .mask = os.system.empty_sigset,
+        .mask = c.empty_sigset,
         .flags = os.SA.RESTART,
     };
     try os.sigaction(os.SIG.WINCH, &sigaction, null);

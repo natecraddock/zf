@@ -15,14 +15,6 @@ const Terminal = term.Terminal;
 
 const eql = std.mem.eql;
 
-// Override the root os so we aren't forced to use libc on Linux (which is missing some constants)
-pub const os = struct {
-    pub const system = switch (@import("builtin").os.tag) {
-        .linux => std.os.linux,
-        else => std.c,
-    };
-};
-
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating
     // and freeing memory during runtime.

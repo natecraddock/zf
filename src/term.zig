@@ -2,6 +2,11 @@ const std = @import("std");
 const system = std.os.system;
 const ziglyph = @import("ziglyph");
 
+const c = switch(@import("builtin").os.tag) {
+    .linux => std.os.linux,
+    else => std.c,
+};
+
 const File = std.fs.File;
 
 // Select Graphic Rendition (SGR) attributes
@@ -67,9 +72,9 @@ pub const Terminal = struct {
         var termios = try std.os.tcgetattr(tty.handle);
         var raw_termios = termios;
 
-        raw_termios.iflag &= ~@as(u32, system.ICRNL);
-        raw_termios.lflag &= ~@as(u32, system.ICANON | system.ECHO | system.ISIG);
-        raw_termios.cc[system.V.MIN] = 0;
+        raw_termios.iflag &= ~@as(u32, c.ICRNL);
+        raw_termios.lflag &= ~@as(u32, c.ICANON | c.ECHO | c.ISIG);
+        raw_termios.cc[c.V.MIN] = 0;
 
         try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
 
@@ -184,8 +189,8 @@ pub const Terminal = struct {
     }
 
     pub fn getSize(self: *Terminal) void {
-        var size: system.winsize = undefined;
-        if (system.ioctl(self.tty.handle, system.T.IOCGWINSZ, @intFromPtr(&size)) == -1) unreachable;
+        var size: c.winsize = undefined;
+        if (c.ioctl(self.tty.handle, c.T.IOCGWINSZ, @intFromPtr(&size)) == -1) unreachable;
         self.width = size.ws_col;
         self.height = size.ws_row;
     }
@@ -205,14 +210,14 @@ pub const Terminal = struct {
                 error.InvalidUtf8 => continue,
                 else => return err,
             };
-            if (cp) |c| {
+            if (cp) |codepoint| {
                 // An escape sequence start
-                if (ziglyph.isControl(c)) {
-                    return self.readEscapeSequence(c);
+                if (ziglyph.isControl(codepoint)) {
+                    return self.readEscapeSequence(codepoint);
                 }
 
                 // Assert the codepoint is valid because we just read it
-                index += std.unicode.utf8Encode(c, buf[index..]) catch unreachable;
+                index += std.unicode.utf8Encode(codepoint, buf[index..]) catch unreachable;
             } else break;
         }
 
