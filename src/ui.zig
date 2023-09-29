@@ -85,10 +85,10 @@ fn calculateHighlights(
 
 // Slices a string to be no longer than the specified width while considering graphemes and display width
 fn graphemeWidthSlice(str: []const u8, width: usize) []const u8 {
-    var iter = ziglyph.GraphemeIterator.init(str) catch unreachable;
+    var iter = ziglyph.GraphemeIterator.init(str);
     var current_width: usize = 0;
     while (iter.next()) |grapheme| {
-        const grapheme_width = dw.strWidth(grapheme.bytes, .half) catch unreachable;
+        const grapheme_width = dw.strWidth(grapheme.slice(str), .half) catch unreachable;
         if (current_width + grapheme_width > width) return str[0..grapheme.offset];
         current_width += grapheme_width;
     }

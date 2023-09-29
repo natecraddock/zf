@@ -100,7 +100,7 @@ fn cursorToBufferIndex(eb: *EditBuffer, pos: usize) usize {
     if (pos == 0) return 0;
 
     // Assert the bytes are valid utf-8
-    var iter = GraphemeIterator.init(eb.buffer.items) catch unreachable;
+    var iter = GraphemeIterator.init(eb.buffer.items);
     var index: usize = 0;
     while (iter.next()) |grapheme| : (index += 1) {
         if (index == pos) {
@@ -115,7 +115,7 @@ fn cursorToBufferIndex(eb: *EditBuffer, pos: usize) usize {
 pub fn bufferIndexToCursor(eb: *EditBuffer, index: usize) usize {
     if (index == 0) return 0;
 
-    var iter = GraphemeIterator.init(eb.buffer.items) catch unreachable;
+    var iter = GraphemeIterator.init(eb.buffer.items);
     var cursor: usize = 0;
     while (iter.next()) |grapheme| : (cursor += 1) {
         if (grapheme.offset == index) {
@@ -129,7 +129,7 @@ pub fn bufferIndexToCursor(eb: *EditBuffer, index: usize) usize {
 /// Returns the length of utf-8 encoded text
 fn utf8Len(bytes: []const u8) usize {
     // Assert the bytes are valid utf-8
-    var iter = GraphemeIterator.init(bytes) catch unreachable;
+    var iter = GraphemeIterator.init(bytes);
     var len: usize = 0;
     while (iter.next()) |_| len += 1;
     return len;
