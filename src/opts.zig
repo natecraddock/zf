@@ -124,9 +124,8 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
             const delimiter = iter.getArg() orelse missingArg(stderr, iter, opt);
             if (delimiter.len == 0) argError(stderr, "delimiter cannot be empty");
             config.delimiter = allocator.dupe(u8, delimiter) catch unreachable;
-        }
-        else if (mem.eql(u8, opt, "0")) {
-            config.delimiter = allocator.dupe(u8, &.{ 0 }) catch unreachable;
+        } else if (mem.eql(u8, opt, "0")) {
+            config.delimiter = allocator.dupe(u8, &.{0}) catch unreachable;
         }
 
         // filter
