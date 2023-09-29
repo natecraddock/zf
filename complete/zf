@@ -12,7 +12,7 @@ _zf() {
             return 0
             ;;
 
-        --lines|-l)
+        --lines|--height|-l)
             COMPREPLY=( $(compgen -W "number" -- $cur) )
             return 0
             ;;
@@ -27,12 +27,12 @@ _zf() {
     # option completions
     case $cur in
         --*)
-            COMPREPLY=( $( compgen -W "--delimiter --filter --keep-order --lines --plain --version --help" -- "$cur" ) )
+            COMPREPLY=( $( compgen -W "--delimiter --filter --height --keep-order --lines --plain --version --help" -- "$cur" ) )
             return 0
             ;;
 
         -*)
-            COMPREPLY=( $( compgen -W "-d -f -k -l -p -v -h" -- $cur ) )
+            COMPREPLY=( $( compgen -W "-d -0 -f -k -l -p -v -h" -- $cur ) )
             ;;
     esac
 
