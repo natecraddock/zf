@@ -1,9 +1,30 @@
 # master
 
-* **feat**: Add `-d` and `--delimiter` options to set custom delimiters
-  ([2f84ce](https://github.com/natecraddock/zf/commit/2f84ce))
+# 0.9.0
 
-  Adds a new option to set a custom delimiter. Defaults to `\n`. If the delimiter is `\n` or `\0` it will be escaped. Currently delimiters are only single bytes, so only the first byte of the delimiter will be used.
+This is a smaller release. The main goal of this is to have a stable version of zf that targets Zig 0.11.0. There are also improvements to support the new Zig package manager, refactorings, and small fixes.
+
+I originally planned to release a UI preview feature in this release, but I ran into some issues with in release builds and I haven't had time to debug properly. So that will be postponed until the next release of zf. But a lot of refactoring to support a UI preview is already included in this release.
+
+And although this news is months old, zf is now available in [nix](https://search.nixos.org/packages?channel=23.05&show=zf&from=0&size=50&sort=relevance&type=packages&query=zf).
+
+* **feat**: add -0, -d and --delimiter options
+  ([2f84ce](https://github.com/natecraddock/zf/commit/2f84ce))
+  ([6b8784](https://github.com/natecraddock/zf/commit/6b8784))
+
+  Adds a new option for setting a custom delimiter for splitting the input. Currently only supports 1 byte delimiters.
+
+  Also adds -0 as a shorthand for `-d'\0'`.
+
+* **feat**: better argument parsing
+  ([0bbee9](https://github.com/natecraddock/zf/commit/0bbee9))
+
+  zf now properly handles chained short options and short options immediately followed by an argument. Error handling and reporting is also improved.
+
+* **fix**: better buffered terminal writes for reduced flicker
+  ([bfb8c2](https://github.com/natecraddock/zf/commit/bfb8c2))
+
+  Further improves the terminal drawing logic to reduce flicker in the UI.
 
 # 0.8.0
 
