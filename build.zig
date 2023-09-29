@@ -35,6 +35,10 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.addModule("ziglyph", ziglyph.module("ziglyph"));
+
+    // This is needed for pselect
+    exe.linkLibC();
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
