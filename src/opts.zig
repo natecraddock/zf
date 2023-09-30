@@ -21,8 +21,6 @@ const help =
     \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
     \\-l, --lines LINES          Alias of --height (deprecated)
     \\-p, --plain                Treat input as plaintext and disable filepath matching features
-    \\    --preview COMMAND      Execute COMMAND for the selected line and display the output in a seprate column
-    \\    --preview-width WIDTH  Set the preview column width (default 60%)
     \\-v, --version              Show version information and exit
     \\-h, --help                 Display this help and exit
 ;
@@ -153,23 +151,23 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
         }
 
         // preview
-        else if (mem.eql(u8, opt, "preview")) {
-            const command = iter.getArg() orelse missingArg(stderr, iter, opt);
-            config.preview = allocator.dupe(u8, command) catch unreachable;
-        }
+        // else if (mem.eql(u8, opt, "preview")) {
+        //     const command = iter.getArg() orelse missingArg(stderr, iter, opt);
+        //     config.preview = allocator.dupe(u8, command) catch unreachable;
+        // }
 
         // preview-width
-        else if (mem.eql(u8, opt, "preview-width")) {
-            const width_str = blk: {
-                const arg = iter.getArg() orelse missingArg(stderr, iter, opt);
-                if (mem.endsWith(u8, arg, "%")) break :blk arg[0 .. arg.len - 1];
-                break :blk arg;
-            };
-            const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "preview-width must be an integer");
-            if (preview_width < 20 or preview_width > 80) argError(stderr, "preview-width must be between 20% and 80%");
+        // else if (mem.eql(u8, opt, "preview-width")) {
+        //     const width_str = blk: {
+        //         const arg = iter.getArg() orelse missingArg(stderr, iter, opt);
+        //         if (mem.endsWith(u8, arg, "%")) break :blk arg[0 .. arg.len - 1];
+        //         break :blk arg;
+        //     };
+        //     const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "preview-width must be an integer");
+        //     if (preview_width < 20 or preview_width > 80) argError(stderr, "preview-width must be between 20% and 80%");
 
-            config.preview_width = @as(f64, @floatFromInt(preview_width)) / 100.0;
-        }
+        //     config.preview_width = @as(f64, @floatFromInt(preview_width)) / 100.0;
+        // }
 
         // invalid option
         else {
