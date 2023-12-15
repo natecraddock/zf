@@ -124,7 +124,7 @@ export fn highlightToken(
     const string = std.mem.span(str);
     const name = if (filename != null) std.mem.span(filename) else null;
     const tok = std.mem.span(token);
-    var matches_slice = matches[0..matches_len];
+    const matches_slice = matches[0..matches_len];
     const matched = filter.highlightToken(string, name, tok, case_sensitive, strict_path, matches_slice);
     return matched.len;
 }

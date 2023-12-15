@@ -28,7 +28,7 @@ pub fn init(allocator: Allocator, loop: *Loop, cmd: []const u8, arg: []const u8)
     const shell = process.getEnvVarOwned(allocator, "SHELL") catch "/bin/sh";
 
     var iter = std.mem.tokenizeSequence(u8, cmd, "{}");
-    var cmd_parts = [2][]const u8{
+    const cmd_parts = [2][]const u8{
         iter.next() orelse cmd,
         iter.next() orelse "",
     };

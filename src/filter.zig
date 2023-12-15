@@ -36,7 +36,7 @@ pub fn collectCandidates(allocator: std.mem.Allocator, buf: []const u8, delimite
 }
 
 test "collectCandidates whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
+    const candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -47,7 +47,7 @@ test "collectCandidates whitespace" {
 }
 
 test "collectCandidates newline" {
-    var candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
+    const candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -58,7 +58,7 @@ test "collectCandidates newline" {
 }
 
 test "collectCandidates excess whitespace" {
-    var candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
+    const candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
     defer testing.allocator.free(candidates);
 
     try testing.expectEqual(@as(usize, 4), candidates.len);
@@ -612,7 +612,7 @@ fn testRankCandidates(
     candidates: []const []const u8,
     expected: []const []const u8,
 ) !void {
-    var ranked_buf = try testing.allocator.alloc(Candidate, candidates.len);
+    const ranked_buf = try testing.allocator.alloc(Candidate, candidates.len);
     defer testing.allocator.free(ranked_buf);
     const ranked = rankCandidates(ranked_buf, candidates, tokens, false, false, false);
 

@@ -381,7 +381,7 @@ pub fn run(
         }
         break :blk try filtered.toOwnedSlice();
     };
-    var filtered_buf = try allocator.alloc(Candidate, candidates.len);
+    const filtered_buf = try allocator.alloc(Candidate, candidates.len);
 
     var state = State{
         .max_height = height,
@@ -393,7 +393,7 @@ pub fn run(
         .query = EditBuffer.init(allocator),
     };
 
-    var tokens_buf = try allocator.alloc([]const u8, 16);
+    const tokens_buf = try allocator.alloc([]const u8, 16);
     var tokens = splitQuery(tokens_buf, state.query.slice());
 
     var loop = try Loop.init(terminal.tty.handle);
