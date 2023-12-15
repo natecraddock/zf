@@ -49,16 +49,16 @@ pub fn main() anyerror!void {
         }
     };
 
-    var candidates = try filter.collectCandidates(allocator, buf, delimiter);
+    const candidates = try filter.collectCandidates(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.filter) |query| {
         // Use the heap here rather than an array on the stack. Testing showed that this is actually
         // faster, likely due to locality with other heap-alloced data used in the algorithm.
-        var tokens_buf = try allocator.alloc([]const u8, 16);
+        const tokens_buf = try allocator.alloc([]const u8, 16);
         const tokens = ui.splitQuery(tokens_buf, query);
         const case_sensitive = ui.hasUpper(query);
-        var filtered_buf = try allocator.alloc(filter.Candidate, candidates.len);
+        const filtered_buf = try allocator.alloc(filter.Candidate, candidates.len);
         const filtered = filter.rankCandidates(filtered_buf, candidates, tokens, config.keep_order, config.plain, case_sensitive);
         if (filtered.len == 0) std.process.exit(1);
         for (filtered) |candidate| {
@@ -82,7 +82,7 @@ pub fn main() anyerror!void {
         } else |_| .cyan;
 
         var terminal = try Terminal.init(highlight_color, no_color);
-        var selected = ui.run(
+        const selected = ui.run(
             allocator,
             &terminal,
             normalizer,

@@ -69,7 +69,7 @@ pub const Terminal = struct {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
 
         // store original terminal settings to restore later
-        var termios = try std.os.tcgetattr(tty.handle);
+        const termios = try std.os.tcgetattr(tty.handle);
         var raw_termios = termios;
 
         raw_termios.iflag &= ~@as(u32, c.ICRNL);
