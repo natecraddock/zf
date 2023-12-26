@@ -549,7 +549,7 @@ fn lineUp(state: *State) void {
 }
 
 fn lineDown(state: *State, visible_rows: usize, num_truncated: usize) void {
-    if (state.selected < visible_rows - 1) {
+    if (state.selected + 1 < visible_rows) {
         state.selected += 1;
     } else if (state.offset < num_truncated) {
         state.offset += 1;
