@@ -35,7 +35,9 @@ pub fn main() anyerror!void {
     const buf = blk: {
         var stdin = io.getStdIn().reader();
         const buf = try readAll(allocator, &stdin);
-        break :blk std.mem.trim(u8, (try normalizer.nfd(allocator, buf)).slice, "\n");
+        if (std.unicode.utf8ValidateSlice(buf)) {
+            break :blk std.mem.trim(u8, (try normalizer.nfd(allocator, buf)).slice, "\n");
+        } else break :blk std.mem.trim(u8, buf, "\n");
     };
 
     // escape specific delimiters
