@@ -1,14 +1,5 @@
 const std = @import("std");
 
-fn dir() []const u8 {
-    return std.fs.path.dirname(@src().file) orelse ".";
-}
-
-pub const package = std.build.Pkg{
-    .name = "zf",
-    .source = .{ .path = dir() ++ "/src/lib.zig" },
-};
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
