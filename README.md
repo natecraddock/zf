@@ -2,7 +2,16 @@
 
 [![shield showing current tests status](https://github.com/natecraddock/zf/actions/workflows/tests.yml/badge.svg)](https://github.com/natecraddock/zf/actions/workflows/tests.yml) [![Packaging status](https://repology.org/badge/tiny-repos/zf.svg)](https://repology.org/project/zf/versions)
 
-zf is an interactive commandline fuzzy finder that prioritizes matches on filenames. zf accepts newline separated strings on `stdin` and outputs the selected line on `stdout`. Use with a pipe, or io redirection. See the [documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md) for more details. zf is also packaged as an allocation-free library for fuzzy filtering.
+zf is a fuzzy finder that excels at filtering filepaths:
+
+* [because filenames are usually unique](https://nathancraddock.com/blog/in-search-of-a-better-finder/#data-collection), matches on filenames are prioritized
+* when the query resembles a file path, zf [uses heuristics for a more accurate match](#strict-path-matching)
+
+While it also functions as a general-purpose fuzzy finder, the goal of zf is to be more accurate than other fuzzy finders when filtering filepaths. If you find something that could be improved, please [let me know](https://github.com/natecraddock/zf/issues).
+
+zf is also available as an allocation-free library for fuzzy filtering.
+
+## Demo
 
 https://user-images.githubusercontent.com/7967463/225198950-a6ab568f-644f-40a1-b202-c12a35aeaed8.mp4
 
