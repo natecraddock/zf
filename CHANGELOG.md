@@ -1,5 +1,17 @@
 # master
 
+# 0.9.1
+
+Fixes two possible crashes
+
+* **fix**: fix crash when input is invalid utf8
+  ([50e3a8](https://github.com/natecraddock/zf/commit/50e3a8))
+
+  zf incorrectly assumed that the input was valid utf-8 encoded unicode. Now the input is validated before normalization.
+
+* **fix**: avoid integer overflow when selecting line down
+  ([0456b7](https://github.com/natecraddock/zf/commit/0456b7))
+
 # 0.9.0
 
 This is a smaller release. The main goal of this is to have a stable version of zf that targets Zig 0.11.0. There are also improvements to support the new Zig package manager, refactorings, and small fixes.
