@@ -8,7 +8,7 @@ const std = @import("std");
 const Allocator = mem.Allocator;
 const File = std.fs.File;
 
-const version = "0.9.0";
+const version = "0.9.1";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =
