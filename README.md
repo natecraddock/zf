@@ -11,6 +11,8 @@ While it also functions as a general-purpose fuzzy finder, the goal of zf is to 
 
 zf is also available as an allocation-free library for fuzzy filtering.
 
+[Try it online!](https://nathancraddock.com/zf-playground/)
+
 ## Demo
 
 https://user-images.githubusercontent.com/7967463/225198950-a6ab568f-644f-40a1-b202-c12a35aeaed8.mp4
