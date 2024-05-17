@@ -2,6 +2,7 @@
 
 const mem = std.mem;
 const os = std.os;
+const posix = std.posix;
 const process = std.process;
 const std = @import("std");
 
@@ -71,8 +72,15 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
     child.stderr_behavior = .Pipe;
     try child.spawn();
 
-    _ = try os.fcntl(child.stdout.?.handle, os.F.SETFL, os.O.NONBLOCK);
-    _ = try os.fcntl(child.stderr.?.handle, os.F.SETFL, os.O.NONBLOCK);
+    _ = try posix.fcntl(child.stdout.?.handle, posix.F.SETFL, @as(
+        u32,
+        @bitCast(posix.O{ .NONBLOCK = true }),
+    ));
+    _ = try posix.fcntl(
+        child.stderr.?.handle,
+        posix.F.SETFL,
+        @as(u32, @bitCast(posix.O{ .NONBLOCK = true })),
+    );
 
     previewer.loop.setChild(child.stdout.?.handle, child.stderr.?.handle);
     previewer.child = child;
