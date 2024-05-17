@@ -2,7 +2,7 @@ const std = @import("std");
 const system = std.os.system;
 const ziglyph = @import("ziglyph");
 
-const c = switch(@import("builtin").os.tag) {
+const c = switch (@import("builtin").os.tag) {
     .linux => std.os.linux,
     else => std.c,
 };
@@ -52,8 +52,8 @@ pub const InputBuffer = union(enum) {
 pub const Terminal = struct {
     tty: File,
     writer: File.Writer,
-    termios: std.os.termios,
-    raw_termios: std.os.termios,
+    termios: std.posix.termios,
+    raw_termios: std.posix.termios,
 
     width: usize = undefined,
     height: usize = undefined,
@@ -69,14 +69,16 @@ pub const Terminal = struct {
         var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
 
         // store original terminal settings to restore later
-        const termios = try std.os.tcgetattr(tty.handle);
+        const termios = try std.posix.tcgetattr(tty.handle);
         var raw_termios = termios;
 
-        raw_termios.iflag &= ~@as(u32, c.ICRNL);
-        raw_termios.lflag &= ~@as(u32, c.ICANON | c.ECHO | c.ISIG);
-        raw_termios.cc[c.V.MIN] = 0;
+        raw_termios.iflag.ICRNL = true;
+        raw_termios.lflag.ICANON = true;
+        raw_termios.lflag.ECHO = true;
+        raw_termios.lflag.ISIG = true;
+        raw_termios.cc[@intFromEnum(c.V.MIN)] = 0;
 
-        try std.os.tcsetattr(tty.handle, .NOW, raw_termios);
+        try std.posix.tcsetattr(tty.handle, .NOW, raw_termios);
 
         var term = Terminal{
             .tty = tty,
@@ -104,7 +106,7 @@ pub const Terminal = struct {
 
         self.flush();
 
-        std.os.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
+        std.posix.tcsetattr(self.tty.handle, .NOW, self.termios) catch return;
         self.tty.close();
     }
 

@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     // Expose zf as a Zig module
     _ = b.addModule("zf", .{
-        .root_source_file = .{ .path = "src/lib.zig" },
+        .root_source_file = b.path("src/lib.zig"),
     });
 
     const ziglyph = b.dependency("ziglyph", .{
@@ -16,12 +16,12 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zf",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
     exe.addCSourceFile(.{
-        .file = .{ .path = "src/loop.c" },
+        .file = b.path("src/loop.c"),
         .flags = &.{},
     });
 
@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });

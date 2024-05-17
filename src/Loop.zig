@@ -3,10 +3,10 @@
 //! Because pselect is difficult to call from Zig, a portion of the code is written in C.
 //! See loop.c for more details.
 
-const os = std.os;
+const os = std.posix;
 const std = @import("std");
 
-const c = switch(@import("builtin").os.tag) {
+const c = switch (@import("builtin").os.tag) {
     .linux => std.os.linux,
     else => std.c,
 };
