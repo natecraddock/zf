@@ -70,21 +70,37 @@ pub const Terminal = struct {
 
         // store original terminal settings to restore later
         const termios = try std.posix.tcgetattr(tty.handle);
-        var raw_termios = termios;
+        var raw = termios;
 
-        raw_termios.iflag.ICRNL = true;
-        raw_termios.lflag.ICANON = true;
-        raw_termios.lflag.ECHO = true;
-        raw_termios.lflag.ISIG = true;
-        raw_termios.cc[@intFromEnum(c.V.MIN)] = 0;
+        raw.iflag.IGNBRK = false;
+        raw.iflag.BRKINT = false;
+        raw.iflag.PARMRK = false;
+        raw.iflag.ISTRIP = false;
+        raw.iflag.INLCR = false;
+        raw.iflag.IGNCR = false;
+        raw.iflag.ICRNL = false;
+        raw.iflag.IXON = false;
 
-        try std.posix.tcsetattr(tty.handle, .NOW, raw_termios);
+        raw.oflag.OPOST = false;
+
+        raw.lflag.ECHO = false;
+        raw.lflag.ECHONL = false;
+        raw.lflag.ICANON = false;
+        raw.lflag.ISIG = false;
+        raw.lflag.IEXTEN = false;
+
+        raw.cflag.CSIZE = .CS8;
+        raw.cflag.PARENB = false;
+
+        raw.cc[@intFromEnum(c.V.MIN)] = 0;
+
+        try std.posix.tcsetattr(tty.handle, .NOW, raw);
 
         var term = Terminal{
             .tty = tty,
             .writer = tty.writer(),
             .termios = termios,
-            .raw_termios = raw_termios,
+            .raw_termios = raw,
             .highlight_color = highlight_color,
             .no_color = no_color,
         };
