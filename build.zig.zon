@@ -4,7 +4,7 @@
     .version = "0.10.0",
     .dependencies = .{
         .ziglyph = .{
-            .url = "https://codeberg.org/theoparis/ziglyph/archive/4a72976b2978d56f2239567c1e68e6d14a235949.tar.gz",
+            .url = "https://codeberg.org/dude_the_builder/ziglyph/archive/b89d43d1e3fb01b6074bc1f7fc980324b04d26a5.tar.gz",
             .hash = "12207831bce7d4abce57b5a98e8f3635811cfefd160bca022eb91fe905d36a02cf25",
         },
     },
