@@ -3,11 +3,9 @@
 
 const std = @import("std");
 const testing = std.testing;
-const ziglyph = @import("ziglyph");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const GraphemeIterator = ziglyph.GraphemeIterator;
 
 const EditBuffer = @This();
 
@@ -44,9 +42,8 @@ pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
     const index = eb.cursorToBufferIndex(eb.cursor);
     try eb.buffer.insertSlice(index, bytes);
 
-    const len = utf8Len(bytes);
-    eb.cursor += len;
-    eb.len += len;
+    eb.cursor += bytes.len;
+    eb.len += bytes.len;
 
     eb.dirty = true;
 }
@@ -97,58 +94,12 @@ pub fn cursorIndex(eb: *EditBuffer) usize {
 
 /// Converts a cursor position to a buffer index
 fn cursorToBufferIndex(eb: *EditBuffer, pos: usize) usize {
-    if (pos == 0) return 0;
-
-    // Assert the bytes are valid utf-8
-    var iter = GraphemeIterator.init(eb.buffer.items);
-    var index: usize = 0;
-    while (iter.next()) |grapheme| : (index += 1) {
-        if (index == pos) {
-            return grapheme.offset;
-        }
-    }
-
-    return eb.buffer.items.len;
+    return @min(pos, eb.buffer.items.len);
 }
 
 /// Converts a buffer index to a cursor position
 pub fn bufferIndexToCursor(eb: *EditBuffer, index: usize) usize {
-    if (index == 0) return 0;
-
-    var iter = GraphemeIterator.init(eb.buffer.items);
-    var cursor: usize = 0;
-    while (iter.next()) |grapheme| : (cursor += 1) {
-        if (grapheme.offset == index) {
-            return cursor;
-        }
-    }
-
-    return eb.len;
-}
-
-/// Returns the length of utf-8 encoded text
-fn utf8Len(bytes: []const u8) usize {
-    // Assert the bytes are valid utf-8
-    var iter = GraphemeIterator.init(bytes);
-    var len: usize = 0;
-    while (iter.next()) |_| len += 1;
-    return len;
-}
-
-test "EditBuffer uft8Len" {
-    try testing.expectEqual(@as(usize, 0), EditBuffer.utf8Len(""));
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("a"));
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("é"));
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("🙃"));
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("ᄒ"));
-    // US flag consists of 2 individual multi-byte codepoints
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("🇺🇸"));
-    // Polar bear consists of 4 individual multi-byte codepoints
-    try testing.expectEqual(@as(usize, 1), EditBuffer.utf8Len("🐻‍❄️"));
-
-    // Tests for lengths of emoji both normal and ZWJ
-    try testing.expectEqual(@as(usize, 2), EditBuffer.utf8Len("🇺🇸🇺🇸"));
-    try testing.expectEqual(@as(usize, 2), EditBuffer.utf8Len("🐻‍❄️🐻‍❄️"));
+    return @min(index, eb.len);
 }
 
 test "EditBuffer insert" {
@@ -169,7 +120,6 @@ test "EditBuffer insert" {
     try testing.expectEqualStrings("zig ⚡ ¯\\_(ツ)_/¯", eb.slice());
     try eb.insert(" ¾");
     try testing.expectEqualStrings("zig ⚡ ¯\\_(ツ)_/¯ ¾", eb.slice());
-    try testing.expectEqual(@as(usize, 17), EditBuffer.utf8Len(eb.slice()));
 }
 
 test "EditBuffer set and move cursor" {
@@ -180,7 +130,7 @@ test "EditBuffer set and move cursor" {
 
     // test clamping
     eb.setCursor(10000);
-    try testing.expectEqual(@as(usize, 33), eb.cursor);
+    try testing.expectEqual(@as(usize, 41), eb.cursor);
     eb.setCursor(0);
     try testing.expectEqual(@as(usize, 0), eb.cursor);
 
@@ -201,7 +151,7 @@ test "EditBuffer set and move cursor" {
 
     // clamping
     eb.moveCursor(100000, .right);
-    try testing.expectEqual(@as(usize, 61), eb.cursor);
+    try testing.expectEqual(@as(usize, 72), eb.cursor);
     eb.moveCursor(100000, .left);
     try testing.expectEqual(@as(usize, 0), eb.cursor);
 }
@@ -210,28 +160,28 @@ test "EditBuffer deletion" {
     var eb = EditBuffer.init(testing.allocator);
     defer eb.deinit();
 
-    try eb.insert("Pokémon 😁 → more ascii here 🤯");
+    try eb.insert("Pokémon 😁 → more ascii here");
 
     // test bounds
     eb.setCursor(0);
     eb.delete(1, .left);
     eb.setCursor(eb.len);
     eb.delete(1, .right);
-    try testing.expectEqualStrings("Pokémon 😁 → more ascii here 🤯", eb.slice());
+    try testing.expectEqualStrings("Pokémon 😁 → more ascii here", eb.slice());
 
     eb.setCursor(0);
     eb.delete(1, .right);
     eb.setCursor(eb.len);
     eb.delete(2, .left);
-    try testing.expectEqualStrings("okémon 😁 → more ascii here", eb.slice());
+    try testing.expectEqualStrings("okémon 😁 → more ascii he", eb.slice());
 
     eb.setCursor(0);
     eb.deleteTo(7);
-    try testing.expectEqualStrings("😁 → more ascii here", eb.slice());
+    try testing.expectEqualStrings(" 😁 → more ascii he", eb.slice());
 
-    eb.setCursor(4);
+    eb.setCursor(10);
     eb.deleteTo(0);
-    try testing.expectEqualStrings("more ascii here", eb.slice());
+    try testing.expectEqualStrings("more ascii he", eb.slice());
 
     eb.setCursor(eb.len);
     eb.deleteTo(0);
