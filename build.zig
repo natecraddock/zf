@@ -9,11 +9,6 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/lib.zig"),
     });
 
-    const ziglyph = b.dependency("ziglyph", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
     const exe = b.addExecutable(.{
         .name = "zf",
         .root_source_file = b.path("src/main.zig"),
@@ -24,11 +19,6 @@ pub fn build(b: *std.Build) void {
         .file = b.path("src/loop.c"),
         .flags = &.{},
     });
-
-    exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-
-    // This is needed for pselect
-    exe.linkLibC();
 
     b.installArtifact(exe);
 
@@ -44,7 +34,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
 
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run tests");

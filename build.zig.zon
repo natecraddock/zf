@@ -2,11 +2,6 @@
     .name = "zf",
     .description = "a commandline fuzzy finder designed for filtering filepaths",
     .version = "0.9.2",
-    .dependencies = .{
-        .ziglyph = .{
-            .url = "https://codeberg.org/dude_the_builder/ziglyph/archive/b89d43d1e3fb01b6074bc1f7fc980324b04d26a5.tar.gz",
-            .hash = "12207831bce7d4abce57b5a98e8f3635811cfefd160bca022eb91fe905d36a02cf25",
-        },
-    },
+    .dependencies = .{},
     .paths = .{""},
 }

@@ -6,7 +6,6 @@ const std = @import("std");
 const term = @import("term.zig");
 const testing = std.testing;
 const ui = @import("ui.zig");
-const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
 const SGRAttribute = term.SGRAttribute;
@@ -62,12 +61,15 @@ pub fn main() anyerror!void {
         }
     } else {
         const prompt_str = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
+        _ = prompt_str;
         const vi_mode = if (std.process.getEnvVarOwned(allocator, "ZF_VI_MODE")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
+        _ = vi_mode;
         const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
+        _ = no_color;
         const highlight_color: SGRAttribute = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
             inline for (std.meta.fields(SGRAttribute)) |field| {
                 if (eql(u8, value, field.name)) {
@@ -76,33 +78,34 @@ pub fn main() anyerror!void {
             }
             break :blk .cyan;
         } else |_| .cyan;
+        _ = highlight_color;
 
-        var terminal = try Terminal.init(highlight_color, no_color);
-        const selected = ui.run(
-            allocator,
-            &terminal,
-            candidates,
-            config.keep_order,
-            config.plain,
-            config.height,
-            config.preview,
-            config.preview_width,
-            prompt_str,
-            vi_mode,
-        ) catch |err| switch (err) {
-            error.UnknownANSIEscape => {
-                try terminal.deinit(0);
-                try stderr.print("zf: unknown ANSI escape sequence in ZF_PROMPT\n", .{});
-                std.process.exit(2);
-            },
-            else => {
-                try terminal.deinit(0);
-                return err;
-            },
-        };
+        // var terminal = try Terminal.init(highlight_color, no_color);
+        // const selected = ui.run(
+        //     allocator,
+        //     &terminal,
+        //     candidates,
+        //     config.keep_order,
+        //     config.plain,
+        //     config.height,
+        //     config.preview,
+        //     config.preview_width,
+        //     prompt_str,
+        //     vi_mode,
+        // ) catch |err| switch (err) {
+        //     error.UnknownANSIEscape => {
+        //         try terminal.deinit(0);
+        //         try stderr.print("zf: unknown ANSI escape sequence in ZF_PROMPT\n", .{});
+        //         std.process.exit(2);
+        //     },
+        //     else => {
+        //         try terminal.deinit(0);
+        //         return err;
+        //     },
+        // };
 
-        try terminal.deinit(config.height);
-
+        // try terminal.deinit(config.height);
+        const selected: ?[1][]const u8 = .{"hello"};
         if (selected) |selected_lines| {
             for (selected_lines) |str| {
                 try stdout.print("{s}\n", .{str});
