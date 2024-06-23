@@ -106,7 +106,7 @@ test "EditBuffer insert" {
     var eb = EditBuffer.init(testing.allocator);
     defer eb.deinit();
 
-    try testing.expectEqual(@as(usize, 0), eb.cursor);
+    try testing.expectEqual(0, eb.cursor);
     try eb.insert("z");
     try testing.expectEqualStrings("z", eb.slice());
     try eb.insert("i");
@@ -130,9 +130,9 @@ test "EditBuffer set and move cursor" {
 
     // test clamping
     eb.setCursor(10000);
-    try testing.expectEqual(@as(usize, 41), eb.cursor);
+    try testing.expectEqual(41, eb.cursor);
     eb.setCursor(0);
-    try testing.expectEqual(@as(usize, 0), eb.cursor);
+    try testing.expectEqual(0, eb.cursor);
 
     // insert at the beginning
     try eb.insert("The Alphabet: ");
@@ -151,9 +151,9 @@ test "EditBuffer set and move cursor" {
 
     // clamping
     eb.moveCursor(100000, .right);
-    try testing.expectEqual(@as(usize, 72), eb.cursor);
+    try testing.expectEqual(72, eb.cursor);
     eb.moveCursor(100000, .left);
-    try testing.expectEqual(@as(usize, 0), eb.cursor);
+    try testing.expectEqual(0, eb.cursor);
 }
 
 test "EditBuffer deletion" {

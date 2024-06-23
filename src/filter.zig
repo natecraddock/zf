@@ -39,7 +39,7 @@ test "collectCandidates whitespace" {
     const candidates = try collectCandidates(testing.allocator, "first second third fourth", ' ');
     defer testing.allocator.free(candidates);
 
-    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqual(4, candidates.len);
     try testing.expectEqualStrings("first", candidates[0]);
     try testing.expectEqualStrings("second", candidates[1]);
     try testing.expectEqualStrings("third", candidates[2]);
@@ -50,7 +50,7 @@ test "collectCandidates newline" {
     const candidates = try collectCandidates(testing.allocator, "first\nsecond\nthird\nfourth", '\n');
     defer testing.allocator.free(candidates);
 
-    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqual(4, candidates.len);
     try testing.expectEqualStrings("first", candidates[0]);
     try testing.expectEqualStrings("second", candidates[1]);
     try testing.expectEqualStrings("third", candidates[2]);
@@ -61,7 +61,7 @@ test "collectCandidates excess whitespace" {
     const candidates = try collectCandidates(testing.allocator, "   first second   third fourth   ", ' ');
     defer testing.allocator.free(candidates);
 
-    try testing.expectEqual(@as(usize, 4), candidates.len);
+    try testing.expectEqual(4, candidates.len);
     try testing.expectEqualStrings("first", candidates[0]);
     try testing.expectEqualStrings("second", candidates[1]);
     try testing.expectEqualStrings("third", candidates[2]);
@@ -252,13 +252,13 @@ pub fn segmentLen(str: []const u8, index: usize) usize {
 }
 
 test "segmentLen" {
-    try testing.expectEqual(@as(usize, 1), segmentLen("a", 0));
-    try testing.expectEqual(@as(usize, 1), segmentLen("/a", 1));
-    try testing.expectEqual(@as(usize, 1), segmentLen("/a/", 1));
-    try testing.expectEqual(@as(usize, 3), segmentLen("src/main.zig", 0));
-    try testing.expectEqual(@as(usize, 3), segmentLen("src/main.zig", 2));
-    try testing.expectEqual(@as(usize, 8), segmentLen("src/main.zig", 5));
-    try testing.expectEqual(@as(usize, 1), segmentLen("a/b", 1));
+    try testing.expectEqual(1, segmentLen("a", 0));
+    try testing.expectEqual(1, segmentLen("/a", 1));
+    try testing.expectEqual(1, segmentLen("/a/", 1));
+    try testing.expectEqual(3, segmentLen("src/main.zig", 0));
+    try testing.expectEqual(3, segmentLen("src/main.zig", 2));
+    try testing.expectEqual(8, segmentLen("src/main.zig", 5));
+    try testing.expectEqual(1, segmentLen("a/b", 1));
 }
 
 pub fn rankToken(
@@ -338,12 +338,12 @@ pub fn rankToken(
 
 test "rankToken" {
     // plain string matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("", null, "b", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("a", null, "b", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("aaa", null, "aab", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("abbba", null, "abab", false, false));
+    try testing.expectEqual(null, rankToken("", null, "", false, false));
+    try testing.expectEqual(null, rankToken("", null, "b", false, false));
+    try testing.expectEqual(null, rankToken("a", null, "", false, false));
+    try testing.expectEqual(null, rankToken("a", null, "b", false, false));
+    try testing.expectEqual(null, rankToken("aaa", null, "aab", false, false));
+    try testing.expectEqual(null, rankToken("abbba", null, "abab", false, false));
 
     try testing.expect(rankToken("a", null, "a", false, false) != null);
     try testing.expect(rankToken("abc", null, "abc", false, false) != null);
@@ -353,12 +353,12 @@ test "rankToken" {
     try testing.expect(rankToken("a", null, "a", false, false) != null);
 
     // file name matching
-    try testing.expectEqual(@as(?f64, null), rankToken("", "", "", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a", "a", "b", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("c/a", "a", "b", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "z", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/file.ext", "file.ext", "fext.", false, false));
-    try testing.expectEqual(@as(?f64, null), rankToken("/a/b/c", "c", "d", false, false));
+    try testing.expectEqual(null, rankToken("", "", "", false, false));
+    try testing.expectEqual(null, rankToken("/a", "a", "b", false, false));
+    try testing.expectEqual(null, rankToken("c/a", "a", "b", false, false));
+    try testing.expectEqual(null, rankToken("/file.ext", "file.ext", "z", false, false));
+    try testing.expectEqual(null, rankToken("/file.ext", "file.ext", "fext.", false, false));
+    try testing.expectEqual(null, rankToken("/a/b/c", "c", "d", false, false));
 
     try testing.expect(rankToken("/b", "b", "b", false, false) != null);
     try testing.expect(rankToken("/a/b/c", "c", "c", false, false) != null);
@@ -371,11 +371,11 @@ test "rankToken" {
     try testing.expect(rankToken("path/to/file.ext", "file.ext", "p/t/f", false, false) != null);
 
     // strict path matching
-    try testing.expectEqual(@as(?f64, null), rankToken("a/b", "b", "ab", false, true));
-    try testing.expectEqual(@as(?f64, null), rankToken("a/b/c", "c", "abc", false, true));
-    try testing.expectEqual(@as(?f64, null), rankToken("app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "mod/", false, true));
-    try testing.expectEqual(@as(?f64, null), rankToken("app/models/foo/bar/baz.rb", "baz.rb", "mod/barbaz", false, true));
-    try testing.expectEqual(@as(?f64, null), rankToken("/some/path/here", "here", "/somepath", false, true));
+    try testing.expectEqual(null, rankToken("a/b", "b", "ab", false, true));
+    try testing.expectEqual(null, rankToken("a/b/c", "c", "abc", false, true));
+    try testing.expectEqual(null, rankToken("app/monsters/dungeon/foo/bar/baz.rb", "baz.rb", "mod/", false, true));
+    try testing.expectEqual(null, rankToken("app/models/foo/bar/baz.rb", "baz.rb", "mod/barbaz", false, true));
+    try testing.expectEqual(null, rankToken("/some/path/here", "here", "/somepath", false, true));
 
     try testing.expect(rankToken("a/b/c", "c", "a/c", false, true) != null);
     try testing.expect(rankToken("a/b/c", "c", "//", false, true) != null);
