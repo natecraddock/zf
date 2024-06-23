@@ -1,5 +1,11 @@
 # master
 
+# 0.9.2
+
+This release supports both Zig 0.12.0 and 0.13.0.
+
+No changes since the last release. Just tagging a new version so package managers can build with the newest releases of Zig.
+
 # 0.9.1
 
 Fixes two possible crashes
