@@ -9,7 +9,6 @@ const ui = @import("ui.zig");
 const ziglyph = @import("ziglyph");
 
 const ArrayList = std.ArrayList;
-const Normalizer = ziglyph.Normalizer;
 const SGRAttribute = term.SGRAttribute;
 const Terminal = term.Terminal;
 
@@ -28,16 +27,11 @@ pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
     const config = opts.parse(allocator, args, stderr);
 
-    var normalizer = try Normalizer.init(allocator);
-    defer normalizer.deinit();
-
     // read all lines or exit on out of memory
     const buf = blk: {
         var stdin = io.getStdIn().reader();
         const buf = try readAll(allocator, &stdin);
-        if (std.unicode.utf8ValidateSlice(buf)) {
-            break :blk std.mem.trim(u8, (try normalizer.nfd(allocator, buf)).slice, "\n");
-        } else break :blk std.mem.trim(u8, buf, "\n");
+        break :blk std.mem.trim(u8, buf, "\n");
     };
 
     // escape specific delimiters
@@ -87,7 +81,6 @@ pub fn main() anyerror!void {
         const selected = ui.run(
             allocator,
             &terminal,
-            normalizer,
             candidates,
             config.keep_order,
             config.plain,
