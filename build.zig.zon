@@ -2,6 +2,11 @@
     .name = "zf",
     .description = "a commandline fuzzy finder designed for filtering filepaths",
     .version = "0.9.2",
-    .dependencies = .{},
+    .dependencies = .{
+        .vaxis = .{
+            .url = "https://github.com/rockorager/libvaxis/archive/refs/tags/v0.3.0.tar.gz",
+            .hash = "1220fbb1b748ced787d6a19d3be8a28839e000548b76bae0f183a6e13504e6bc7b20",
+        },
+    },
     .paths = .{""},
 }

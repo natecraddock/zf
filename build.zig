@@ -9,6 +9,11 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/lib.zig"),
     });
 
+    const dep_vaxis = b.dependency("vaxis", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "zf",
         .root_source_file = b.path("src/main.zig"),
@@ -19,6 +24,8 @@ pub fn build(b: *std.Build) void {
         .file = b.path("src/loop.c"),
         .flags = &.{},
     });
+
+    exe.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
 
     b.installArtifact(exe);
 
