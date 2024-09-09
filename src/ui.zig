@@ -1,21 +1,22 @@
-const dw = ziglyph.display_width;
 const filter = @import("filter.zig");
 const std = @import("std");
 const system = std.os.system;
 const term = @import("term.zig");
 const testing = std.testing;
-const ziglyph = @import("ziglyph");
+const vaxis = @import("vaxis");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
+const Key = vaxis.Key;
 const Loop = @import("Loop.zig");
 const Previewer = @import("Previewer.zig");
-const Terminal = term.Terminal;
 
 const sep = std.fs.path.sep;
+
+const Terminal = opaque {};
 
 const State = struct {
     max_height: usize,
@@ -25,7 +26,6 @@ const State = struct {
     prompt: []const u8,
     prompt_width: usize,
     query: EditBuffer,
-    redraw: bool = true,
     case_sensitive: bool = false,
     selection_changed: bool = false,
     preview: ?Previewer = null,
@@ -85,52 +85,60 @@ fn calculateHighlights(
 
 // Slices a string to be no longer than the specified width while considering graphemes and display width
 fn graphemeWidthSlice(str: []const u8, width: usize) []const u8 {
-    var iter = ziglyph.GraphemeIterator.init(str);
-    var current_width: usize = 0;
-    while (iter.next()) |grapheme| {
-        const grapheme_width = dw.strWidth(grapheme.slice(str), .half) catch unreachable;
-        if (current_width + grapheme_width > width) return str[0..grapheme.offset];
-        current_width += grapheme_width;
-    }
-    return str;
+    _ = width;
+    _ = str;
+    return "";
 }
 
 inline fn drawCandidate(
-    terminal: *Terminal,
+    win: vaxis.Window,
+    line: usize,
     candidate: Candidate,
     tokens: [][]const u8,
-    width: usize,
     selected: bool,
     highlight: bool,
     case_sensitive: bool,
     plain: bool,
 ) void {
-    if (highlight) terminal.sgr(.reverse);
-    defer terminal.sgr(.reset);
-
     var matches_buf: [2048]usize = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
     const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, plain, &matches_buf);
 
-    const str_width = dw.strWidth(candidate.str, .half) catch unreachable;
-    const str = graphemeWidthSlice(candidate.str, @min(width - @as(usize, if (selected) 2 else 0), str_width));
-
-    if (selected) {
-        terminal.write("* ");
-    }
-
     // no highlights, just output the string
-    if (matches.len == 0 or terminal.no_color) {
-        _ = terminal.write(str);
+    // TODO: terminal.no_color here
+    if (matches.len == 0) {
+        _ = try win.print(&.{
+            .{ .text = if (selected) "* " else "  " },
+            .{
+                .text = candidate.str,
+                .style = .{ .reverse = highlight },
+            },
+        }, .{
+            .row_offset = line,
+            .col_offset = 0,
+            .wrap = .none,
+        });
     } else {
-        var slicer = HighlightSlicer.init(str, matches);
+        var slicer = HighlightSlicer.init(candidate.str, matches);
+
+        var res = try win.printSegment(.{
+            .text = if (selected) "* " else "  ",
+            .style = .{ .reverse = highlight },
+        }, .{
+            .row_offset = line,
+            .col_offset = 0,
+            .wrap = .none,
+        });
+
         while (slicer.next()) |slice| {
-            if (slice.highlight) {
-                terminal.sgr(terminal.highlight_color);
-            } else {
-                terminal.sgr(.default);
-            }
-            terminal.write(slice.str);
+            res = try win.printSegment(.{
+                .text = slice.str,
+                .style = .{ .reverse = highlight, .fg = if (slice.highlight) .{ .index = 36 } else .default },
+            }, .{
+                .row_offset = line,
+                .col_offset = res.col,
+                .wrap = .none,
+            });
         }
     }
 }
@@ -141,97 +149,88 @@ inline fn numDigits(number: usize) u16 {
 }
 
 fn draw(
-    terminal: *Terminal,
+    vx: *vaxis.Vaxis,
     state: *State,
     tokens: [][]const u8,
     candidates: []Candidate,
     total_candidates: usize,
     plain: bool,
 ) !void {
-    terminal.cursorVisible(false);
+    const win = vx.window();
+    win.clear();
 
-    const width = terminal.width;
+    const child = win.child(.{ .height = .{ .limit = state.max_height } });
+
+    const width = vx.screen.width;
     const preview_width: usize = if (state.preview) |_|
         @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
     else
         0;
     const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
+    _ = items_width;
 
-    const height = @min(terminal.height, state.max_height);
+    const height = @min(vx.screen.height, state.max_height);
 
     // draw the candidates
     var line: usize = 0;
     while (line < height - 1) : (line += 1) {
-        terminal.cursorDown(1);
-        terminal.cursorCol(0);
         if (line < candidates.len) drawCandidate(
-            terminal,
+            child,
+            line + 1,
             candidates[line + state.offset],
             tokens,
-            items_width,
             state.selected_rows.contains(line + state.offset),
             line == state.selected,
             state.case_sensitive,
             plain,
         );
-        terminal.clearToEndOfLine();
     }
-    terminal.sgr(.reset);
-    terminal.cursorUp(height - 1);
-    terminal.clearLine();
 
     // draw the stats
     const num_selected = state.selected_rows.slice().len;
     const stats_width = blk: {
+        var buf: [32]u8 = undefined;
+
         if (num_selected > 0) {
+            const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
             const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
-            terminal.cursorRight(items_width - stats_width);
-            terminal.print("{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
+            _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
             break :blk stats_width;
         } else {
+            const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
             const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-            terminal.cursorRight(items_width - stats_width);
-            terminal.print("{}/{}", .{ candidates.len, total_candidates });
+            _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
             break :blk stats_width;
         }
     };
-    terminal.cursorCol(0);
 
     // draw the prompt
     // TODO: handle display of queries longer than the screen width
-    const query_width = try dw.strWidth(state.query.slice(), .half);
-    terminal.write(state.prompt);
-    terminal.write(graphemeWidthSlice(state.query.slice(), @min(width - state.prompt_width - stats_width - 1, query_width)));
+    // const query_width = state.query.slice().len;
+    _ = try child.print(&.{
+        .{ .text = state.prompt },
+        .{ .text = state.query.slice() },
+    }, .{ .col_offset = 0, .row_offset = 0 });
 
-    // draw a preview window if requested
-    if (state.preview) |*preview| {
-        var lines = preview.lines();
+    // // draw a preview window if requested
+    // if (state.preview) |*preview| {
+    //     var lines = preview.lines();
 
-        for (0..height) |_| {
-            terminal.cursorCol(items_width + 2);
-            terminal.write("│ ");
+    //     for (0..height) |_| {
+    //         terminal.cursorCol(items_width + 2);
+    //         terminal.write("│ ");
 
-            if (lines.next()) |preview_line| {
-                terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
-            }
+    //         if (lines.next()) |preview_line| {
+    //             terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
+    //         }
 
-            terminal.cursorDown(1);
-        }
-        terminal.sgr(.reset);
-    } else terminal.cursorDown(height);
+    //         terminal.cursorDown(1);
+    //     }
+    //     terminal.sgr(.reset);
+    // } else terminal.cursorDown(height);
 
-    // Clear any leftover rows (after a potential resize)
-    terminal.cursorCol(0);
-    terminal.clearToEndOfDisplay();
-    terminal.cursorUp(height);
-
-    // position the cursor at the edit location
-    terminal.cursorCol(0);
-    const cursor_width = try dw.strWidth(state.query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, state.query.cursor)), .half);
-    terminal.cursorRight(@min(width - 1, cursor_width + state.prompt_width));
-
-    terminal.cursorVisible(true);
-    terminal.flush();
+    const cursor_width = state.query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, state.query.cursor)).len;
+    child.showCursor(cursor_width + state.prompt_width, 0);
 }
 
 const Action = union(enum) {
@@ -361,9 +360,13 @@ test "escape ANSI codes" {
     try testEscapeANSI("abcd", "a\x1b[31mb\x1b[32mc\x1b[33md\x1b[0m");
 }
 
+const Event = union(enum) {
+    key_press: vaxis.Key,
+    winsize: vaxis.Winsize,
+};
+
 pub fn run(
     allocator: Allocator,
-    terminal: *Terminal,
     candidates: [][]const u8,
     keep_order: bool,
     plain: bool,
@@ -373,6 +376,8 @@ pub fn run(
     prompt_str: []const u8,
     vi_mode: bool,
 ) !?[]const []const u8 {
+    _ = preview_width;
+    _ = preview_cmd;
     var filtered = blk: {
         var filtered = try ArrayList(Candidate).initCapacity(allocator, candidates.len);
         for (candidates) |candidate| {
@@ -388,24 +393,37 @@ pub fn run(
         .selected_rows = ArrayToggleSet(usize).init(allocator),
         .offset = 0,
         .prompt = prompt_str,
-        .prompt_width = try dw.strWidth(try escapeANSI(allocator, prompt_str), .half),
+        .prompt_width = (try escapeANSI(allocator, prompt_str)).len,
         .query = EditBuffer.init(allocator),
     };
 
     const tokens_buf = try allocator.alloc([]const u8, 16);
     var tokens = splitQuery(tokens_buf, state.query.slice());
 
-    var loop = try Loop.init(terminal.tty.handle);
-    if (preview_cmd) |cmd| {
-        state.preview = try Previewer.init(allocator, &loop, cmd, filtered[0].str);
-        state.preview_width = preview_width;
+    var tty = try vaxis.Tty.init();
+    defer tty.deinit();
+
+    var vx = try vaxis.init(allocator, .{});
+    defer vx.deinit(null, tty.anyWriter());
+    defer {
+        // Clear the window before printing selected lines
+        vx.window().clear();
+        vx.render(tty.anyWriter()) catch unreachable;
     }
 
-    // ensure enough room to draw the ui by drawing blank lines which scrolls the view
+    var loop: vaxis.Loop(Event) = .{
+        .tty = &tty,
+        .vaxis = &vx,
+    };
+    try loop.init();
+
+    try loop.start();
+    defer loop.stop();
+
     {
-        const h = @min(terminal.height, height);
-        terminal.scrollDown(h);
-        terminal.cursorUp(h);
+        // Get initial window size
+        const ws = try vaxis.Tty.getWinsize(tty.fd);
+        try vx.resize(allocator, tty.anyWriter(), ws);
     }
 
     while (true) {
@@ -416,100 +434,86 @@ pub fn run(
             state.case_sensitive = hasUpper(state.query.slice());
 
             filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, state.case_sensitive);
-            state.redraw = true;
             state.selected = 0;
             state.offset = 0;
             state.selected_rows.clear();
         }
 
         // The selection changed and the child process should be respawned
-        if (state.selection_changed) if (state.preview) |*preview| {
-            state.selection_changed = false;
-            if (filtered.len > 0) {
-                try preview.spawn(filtered[state.selected + state.offset].str);
-            } else try preview.reset();
-        };
+        // if (state.selection_changed) if (state.preview) |*preview| {
+        //     state.selection_changed = false;
+        //     if (filtered.len > 0) {
+        //         try preview.spawn(filtered[state.selected + state.offset].str);
+        //     } else try preview.reset();
+        // };
 
-        if (state.redraw) {
-            state.redraw = false;
-            try draw(terminal, &state, tokens, filtered, candidates.len, plain);
-        }
+        try draw(&vx, &state, tokens, filtered, candidates.len, plain);
+        try vx.render(tty.anyWriter());
 
-        const event = loop.wait();
+        const event = loop.nextEvent();
         switch (event) {
-            .resize => {
-                terminal.getSize();
-                state.redraw = true;
-            },
-            .tty => {
-                if (try handleInput(allocator, terminal, &state, filtered, vi_mode)) |selected| {
-                    if (selected.len == 0) return null else return selected;
+            .key_press => |key| {
+                const visible_rows = @min(@min(state.max_height, vx.screen.height) - 1, filtered.len);
+
+                if (key.matches('c', .{ .ctrl = true })) {
+                    return null;
+                } else if (key.matches('w', .{ .ctrl = true })) {
+                    if (state.query.len > 0) deleteWord(&state.query);
+                } else if (key.matches('u', .{ .ctrl = true })) {
+                    state.query.deleteTo(0);
+                } else if (key.matches(Key.backspace, .{})) {
+                    state.query.delete(1, .left);
+                } else if (key.matches('a', .{ .ctrl = true })) {
+                    state.query.setCursor(0);
+                } else if (key.matches('e', .{ .ctrl = true })) {
+                    state.query.setCursor(state.query.len);
+                } else if (key.matches('d', .{ .ctrl = true })) {
+                    state.query.delete(1, .right);
+                } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
+                    state.query.moveCursor(1, .right);
+                } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
+                    state.query.moveCursor(1, .left);
+                } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
+                    lineDown(&state, visible_rows, filtered.len - visible_rows);
+                } else if (key.matches(Key.up, .{})) {
+                    lineUp(&state);
+                } else if (key.matches('k', .{ .ctrl = true })) {
+                    if (vi_mode) lineUp(&state) else state.query.deleteTo(state.query.len);
+                } else if (key.matches(Key.tab, .{ .shift = true })) {
+                    try state.selected_rows.toggle(state.selected + state.offset);
+                    lineUp(&state);
+                } else if (key.matches(Key.tab, .{})) {
+                    try state.selected_rows.toggle(state.selected + state.offset);
+                    lineDown(&state, visible_rows, filtered.len - visible_rows);
+                } else if (key.matches(Key.enter, .{})) {
+                    if (filtered.len == 0) return &.{};
+                    if (state.selected_rows.slice().len > 0) {
+                        var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
+                        for (state.selected_rows.slice(), 0..) |index, i| {
+                            selected_buf[i] = filtered[index].str;
+                        }
+                        return selected_buf;
+                    }
+                    var selected_buf = try allocator.alloc([]const u8, 1);
+                    selected_buf[0] = filtered[state.selected + state.offset].str;
+                    return selected_buf;
+                } else if (key.matches(Key.escape, .{})) {
+                    return &.{};
+                } else if (key.text) |text| {
+                    try state.query.insert(text);
                 }
             },
-            .child_out => {
-                state.redraw = try state.preview.?.read(.stdout);
-            },
-            .child_err => {
-                state.redraw = try state.preview.?.read(.stderr);
-            },
+            .winsize => |ws| try vx.resize(allocator, tty.anyWriter(), ws),
         }
     }
 }
 
-fn handleInput(allocator: Allocator, terminal: *Terminal, state: *State, filtered: []Candidate, vi_mode: bool) !?[]const []const u8 {
-    var buf: [2048]u8 = undefined;
-    const input = try terminal.read(&buf);
-    const action = inputToAction(input, vi_mode);
-
-    var query = &state.query;
-    const last_cursor = query.cursor;
+fn handleInput(state: *State) !?[]const []const u8 {
+    const query = &state.query;
     const last_selected = state.selected;
     const last_offset = state.offset;
 
-    const visible_rows = @min(@min(state.max_height, terminal.height) - 1, filtered.len);
-
-    switch (action) {
-        .str => |str| try query.insert(str),
-        .delete_word => if (query.len > 0) deleteWord(query),
-        .delete_line => query.deleteTo(0),
-        .delete_line_forward => query.deleteTo(query.len),
-        .backspace => query.delete(1, .left),
-        .delete => query.delete(1, .right),
-        .line_up => lineUp(state),
-        .line_down => lineDown(state, visible_rows, filtered.len - visible_rows),
-        .cursor_left => query.moveCursor(1, .left),
-        .cursor_leftmost => query.setCursor(0),
-        .cursor_rightmost => query.setCursor(query.len),
-        .cursor_right => query.moveCursor(1, .right),
-        .select_up => {
-            try state.selected_rows.toggle(state.selected + state.offset);
-            lineUp(state);
-            state.redraw = true;
-        },
-        .select_down => {
-            try state.selected_rows.toggle(state.selected + state.offset);
-            lineDown(state, visible_rows, filtered.len - visible_rows);
-            state.redraw = true;
-        },
-        .confirm => {
-            if (filtered.len == 0) return &.{};
-            if (state.selected_rows.slice().len > 0) {
-                var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
-                for (state.selected_rows.slice(), 0..) |index, i| {
-                    selected_buf[i] = filtered[index].str;
-                }
-                return selected_buf;
-            }
-            var selected_buf = try allocator.alloc([]const u8, 1);
-            selected_buf[0] = filtered[state.selected + state.offset].str;
-            return selected_buf;
-        },
-        .close => return &.{},
-        .pass => {},
-    }
-
-    state.selection_changed = state.redraw or last_selected != state.selected or last_offset != state.offset or query.dirty;
-    state.redraw = state.redraw or last_cursor != state.query.cursor or last_selected != state.selected or last_offset != state.offset;
+    state.selection_changed = last_selected != state.selected or last_offset != state.offset or query.dirty;
 
     return null;
 }

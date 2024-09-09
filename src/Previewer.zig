@@ -14,7 +14,6 @@ const Loop = @import("Loop.zig");
 const Previewer = @This();
 
 allocator: Allocator,
-loop: *Loop,
 
 shell: []const u8,
 cmd_parts: [2][]const u8,
@@ -25,7 +24,7 @@ child: ?Child = null,
 stdout: ArrayList(u8),
 stderr: ArrayList(u8),
 
-pub fn init(allocator: Allocator, loop: *Loop, cmd: []const u8, arg: []const u8) !Previewer {
+pub fn init(allocator: Allocator, cmd: []const u8, arg: []const u8) !Previewer {
     const shell = process.getEnvVarOwned(allocator, "SHELL") catch "/bin/sh";
 
     var iter = std.mem.tokenizeSequence(u8, cmd, "{}");
@@ -36,7 +35,6 @@ pub fn init(allocator: Allocator, loop: *Loop, cmd: []const u8, arg: []const u8)
 
     var previewer = Previewer{
         .allocator = allocator,
-        .loop = loop,
         .shell = shell,
         .cmd_parts = cmd_parts,
         .stdout = ArrayList(u8).init(allocator),
