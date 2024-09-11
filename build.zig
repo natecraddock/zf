@@ -20,10 +20,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.addCSourceFile(.{
-        .file = b.path("src/loop.c"),
-        .flags = &.{},
-    });
 
     exe.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
 

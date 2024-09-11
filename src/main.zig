@@ -3,13 +3,11 @@ const heap = std.heap;
 const io = std.io;
 const opts = @import("opts.zig");
 const std = @import("std");
-const term = @import("term.zig");
 const testing = std.testing;
 const ui = @import("ui.zig");
 
 const ArrayList = std.ArrayList;
-const SGRAttribute = term.SGRAttribute;
-const Terminal = term.Terminal;
+const Color = ui.Color;
 
 pub const std_options = .{
     .log_level = .err,

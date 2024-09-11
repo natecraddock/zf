@@ -9,7 +9,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Child = process.Child;
-const Loop = @import("Loop.zig");
 
 const Previewer = @This();
 

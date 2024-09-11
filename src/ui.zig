@@ -1,7 +1,6 @@
 const filter = @import("filter.zig");
 const std = @import("std");
 const system = std.os.system;
-const term = @import("term.zig");
 const testing = std.testing;
 const vaxis = @import("vaxis");
 
@@ -11,12 +10,29 @@ const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
 const EditBuffer = @import("EditBuffer.zig");
 const Key = vaxis.Key;
-const Loop = @import("Loop.zig");
 const Previewer = @import("Previewer.zig");
 
 const sep = std.fs.path.sep;
 
-const Terminal = opaque {};
+pub const Color = enum(u8) {
+    black = 30,
+    red = 31,
+    green = 32,
+    yellow = 33,
+    blue = 34,
+    magenta = 35,
+    cyan = 36,
+    white = 37,
+    default = 39,
+    bright_black = 90,
+    bright_red = 91,
+    bright_green = 92,
+    bright_yellow = 93,
+    bright_blue = 94,
+    bright_magenta = 95,
+    bright_cyan = 96,
+    bright_white = 97,
+};
 
 const State = struct {
     max_height: usize,
@@ -252,45 +268,6 @@ const Action = union(enum) {
     close,
     pass,
 };
-
-fn ctrl(comptime key: u8) u8 {
-    return key & 0x1f;
-}
-
-fn inputToAction(input: term.InputBuffer, vi_mode: bool) Action {
-    return switch (input) {
-        .str => |bytes| {
-            if (bytes.len == 0) return .pass;
-            return .{ .str = bytes };
-        },
-        .control => |c| switch (c) {
-            ctrl('c') => .close,
-            ctrl('w') => .delete_word,
-            ctrl('u') => .delete_line,
-            ctrl('h') => .backspace,
-            ctrl('a') => .cursor_leftmost,
-            ctrl('e') => .cursor_rightmost,
-            ctrl('d') => .delete,
-            ctrl('f') => .cursor_right,
-            ctrl('b') => .cursor_left,
-            ctrl('p') => .line_up,
-            ctrl('n'), ctrl('j') => .line_down,
-            ctrl('k') => if (vi_mode) .line_up else .delete_line_forward,
-            else => .pass,
-        },
-        .backspace => .backspace,
-        .delete => .delete,
-        .up => .line_up,
-        .down => .line_down,
-        .left => .cursor_left,
-        .right => .cursor_right,
-        .enter => .confirm,
-        .tab => .select_down,
-        .shift_tab => .select_up,
-        .esc => .close,
-        .none => .pass,
-    };
-}
 
 /// split the query on spaces and return a slice of query tokens
 pub fn splitQuery(query_tokens: [][]const u8, query: []const u8) [][]const u8 {
