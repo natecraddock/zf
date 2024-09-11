@@ -40,7 +40,6 @@ const State = struct {
     selected_rows: ArrayToggleSet(usize),
     offset: usize = 0,
     prompt: []const u8,
-    prompt_width: usize,
     query: EditBuffer,
     case_sensitive: bool = false,
     selection_changed: bool = false,
@@ -97,13 +96,6 @@ fn calculateHighlights(
     }
 
     return matches[0..index];
-}
-
-// Slices a string to be no longer than the specified width while considering graphemes and display width
-fn graphemeWidthSlice(str: []const u8, width: usize) []const u8 {
-    _ = width;
-    _ = str;
-    return "";
 }
 
 inline fn drawCandidate(
@@ -254,8 +246,8 @@ fn draw(
     //     terminal.sgr(.reset);
     // } else terminal.cursorDown(height);
 
-    const cursor_width = state.query.sliceRange(0, @min(width - state.prompt_width - stats_width - 1, state.query.cursor)).len;
-    child.showCursor(cursor_width + state.prompt_width, 0);
+    const cursor_width = state.query.sliceRange(0, @min(width - state.prompt.len - stats_width - 1, state.query.cursor)).len;
+    child.showCursor(cursor_width + state.prompt.len, 0);
 }
 
 const Action = union(enum) {
@@ -297,55 +289,6 @@ pub fn hasUpper(query: []const u8) bool {
     return false;
 }
 
-/// Escapes ANSI escape sequences in a given string and returns a new owned slice of bytes
-/// representing the non-ANSI escape characters
-///
-/// Is not intended to cover the entirety of ANSI. Only a reasonable subset. More escaped
-/// codes can be added as needed.
-/// Currently escapes SGR sequences (\x1b[ ... m)
-fn escapeANSI(allocator: Allocator, str: []const u8) ![]const u8 {
-    const EscapeState = enum {
-        esc,
-        left_bracket,
-        sgr,
-    };
-
-    var buf = try ArrayList(u8).initCapacity(allocator, str.len);
-    var state: EscapeState = .esc;
-    for (str) |byte| {
-        switch (state) {
-            .esc => switch (byte) {
-                0x1b => state = .left_bracket,
-                else => buf.appendAssumeCapacity(byte),
-            },
-            .left_bracket => switch (byte) {
-                '[' => state = .sgr,
-                else => state = .esc,
-            },
-            .sgr => switch (byte) {
-                '0'...'9', ';' => continue,
-                'm' => state = .esc,
-                else => return error.UnknownANSIEscape,
-            },
-        }
-    }
-
-    return buf.toOwnedSlice();
-}
-
-fn testEscapeANSI(expected: []const u8, input: []const u8) !void {
-    const escaped = try escapeANSI(testing.allocator, input);
-    defer testing.allocator.free(escaped);
-    try testing.expectEqualStrings(expected, escaped);
-}
-
-test "escape ANSI codes" {
-    try testEscapeANSI("", "\x1b[0m");
-    try testEscapeANSI("str", "\x1b[30mstr");
-    try testEscapeANSI("contents", "\x1b[31mcontents\x1b[0m");
-    try testEscapeANSI("abcd", "a\x1b[31mb\x1b[32mc\x1b[33md\x1b[0m");
-}
-
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
@@ -380,7 +323,6 @@ pub fn run(
         .selected_rows = ArrayToggleSet(usize).init(allocator),
         .offset = 0,
         .prompt = prompt_str,
-        .prompt_width = (try escapeANSI(allocator, prompt_str)).len,
         .query = EditBuffer.init(allocator),
     };
 

@@ -80,7 +80,7 @@ pub fn main() anyerror!void {
             break :blk .cyan;
         } else |_| .cyan;
 
-        const selected = ui.run(
+        const selected = try ui.run(
             allocator,
             candidates,
             config.keep_order,
@@ -91,15 +91,7 @@ pub fn main() anyerror!void {
             prompt_str,
             vi_mode,
             if (no_color) null else highlight_color,
-        ) catch |err| switch (err) {
-            error.UnknownANSIEscape => {
-                try stderr.print("zf: unknown ANSI escape sequence in ZF_PROMPT\n", .{});
-                std.process.exit(2);
-            },
-            else => {
-                return err;
-            },
-        };
+        );
 
         if (selected) |selected_lines| {
             for (selected_lines) |str| {
