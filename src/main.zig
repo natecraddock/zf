@@ -66,19 +66,19 @@ pub fn main() anyerror!void {
         const vi_mode = if (std.process.getEnvVarOwned(allocator, "ZF_VI_MODE")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
+
         const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
-        _ = no_color;
-        const highlight_color: SGRAttribute = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
-            inline for (std.meta.fields(SGRAttribute)) |field| {
+
+        const highlight_color: Color = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
+            inline for (std.meta.fields(Color)) |field| {
                 if (eql(u8, value, field.name)) {
                     break :blk @enumFromInt(field.value);
                 }
             }
             break :blk .cyan;
         } else |_| .cyan;
-        _ = highlight_color;
 
         const selected = ui.run(
             allocator,
@@ -90,6 +90,7 @@ pub fn main() anyerror!void {
             config.preview_width,
             prompt_str,
             vi_mode,
+            if (no_color) null else highlight_color,
         ) catch |err| switch (err) {
             error.UnknownANSIEscape => {
                 try stderr.print("zf: unknown ANSI escape sequence in ZF_PROMPT\n", .{});

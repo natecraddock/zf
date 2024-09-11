@@ -15,23 +15,23 @@ const Previewer = @import("Previewer.zig");
 const sep = std.fs.path.sep;
 
 pub const Color = enum(u8) {
-    black = 30,
-    red = 31,
-    green = 32,
-    yellow = 33,
-    blue = 34,
-    magenta = 35,
-    cyan = 36,
-    white = 37,
-    default = 39,
-    bright_black = 90,
-    bright_red = 91,
-    bright_green = 92,
-    bright_yellow = 93,
-    bright_blue = 94,
-    bright_magenta = 95,
-    bright_cyan = 96,
-    bright_white = 97,
+    black = 0,
+    red = 1,
+    green = 2,
+    yellow = 3,
+    blue = 4,
+    magenta = 5,
+    cyan = 6,
+    white = 7,
+
+    bright_black = 8,
+    bright_red = 9,
+    bright_green = 10,
+    bright_yellow = 11,
+    bright_blue = 12,
+    bright_magenta = 13,
+    bright_cyan = 14,
+    bright_white = 15,
 };
 
 const State = struct {
@@ -115,13 +115,13 @@ inline fn drawCandidate(
     highlight: bool,
     case_sensitive: bool,
     plain: bool,
+    color: ?Color,
 ) void {
     var matches_buf: [2048]usize = undefined;
     const filename = if (plain) null else std.fs.path.basename(candidate.str);
     const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, plain, &matches_buf);
 
     // no highlights, just output the string
-    // TODO: terminal.no_color here
     if (matches.len == 0) {
         _ = try win.print(&.{
             .{ .text = if (selected) "* " else "  " },
@@ -147,9 +147,16 @@ inline fn drawCandidate(
         });
 
         while (slicer.next()) |slice| {
+            const highlight_style: vaxis.Style = .{
+                .reverse = highlight,
+                .fg = if (slice.highlight and color != null) .{
+                    .index = @intFromEnum(color.?),
+                } else .default,
+            };
+
             res = try win.printSegment(.{
                 .text = slice.str,
-                .style = .{ .reverse = highlight, .fg = if (slice.highlight) .{ .index = 36 } else .default },
+                .style = highlight_style,
             }, .{
                 .row_offset = line,
                 .col_offset = res.col,
@@ -171,6 +178,7 @@ fn draw(
     candidates: []Candidate,
     total_candidates: usize,
     plain: bool,
+    color: ?Color,
 ) !void {
     const win = vx.window();
     win.clear();
@@ -199,6 +207,7 @@ fn draw(
             line == state.selected,
             state.case_sensitive,
             plain,
+            color,
         );
     }
 
@@ -352,6 +361,7 @@ pub fn run(
     preview_width: f64,
     prompt_str: []const u8,
     vi_mode: bool,
+    highight_color: ?Color,
 ) !?[]const []const u8 {
     _ = preview_width;
     _ = preview_cmd;
@@ -424,7 +434,7 @@ pub fn run(
         //     } else try preview.reset();
         // };
 
-        try draw(&vx, &state, tokens, filtered, candidates.len, plain);
+        try draw(&vx, &state, tokens, filtered, candidates.len, plain, highight_color);
         try vx.render(tty.anyWriter());
 
         const event = loop.nextEvent();
