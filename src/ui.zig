@@ -1,7 +1,5 @@
 const filter = @import("filter.zig");
 const std = @import("std");
-const system = std.os.system;
-const testing = std.testing;
 const vaxis = @import("vaxis");
 
 const Allocator = std.mem.Allocator;
@@ -98,7 +96,7 @@ fn calculateHighlights(
     return matches[0..index];
 }
 
-inline fn drawCandidate(
+fn drawCandidate(
     win: vaxis.Window,
     line: usize,
     candidate: Candidate,
@@ -158,7 +156,7 @@ inline fn drawCandidate(
     }
 }
 
-inline fn numDigits(number: usize) u16 {
+fn numDigits(number: usize) u16 {
     if (number == 0) return 1;
     return @intCast(std.math.log10(number) + 1);
 }
@@ -249,26 +247,6 @@ fn draw(
     const cursor_width = state.query.sliceRange(0, @min(width - state.prompt.len - stats_width - 1, state.query.cursor)).len;
     child.showCursor(cursor_width + state.prompt.len, 0);
 }
-
-const Action = union(enum) {
-    str: []u8,
-    line_up,
-    line_down,
-    cursor_left,
-    cursor_leftmost,
-    cursor_right,
-    cursor_rightmost,
-    backspace,
-    delete,
-    delete_word,
-    delete_line,
-    delete_line_forward,
-    select_up,
-    select_down,
-    confirm,
-    close,
-    pass,
-};
 
 /// split the query on spaces and return a slice of query tokens
 pub fn splitQuery(query_tokens: [][]const u8, query: []const u8) [][]const u8 {
@@ -435,16 +413,6 @@ pub fn run(
             .winsize => |ws| try vx.resize(allocator, tty.anyWriter(), ws),
         }
     }
-}
-
-fn handleInput(state: *State) !?[]const []const u8 {
-    const query = &state.query;
-    const last_selected = state.selected;
-    const last_offset = state.offset;
-
-    state.selection_changed = last_selected != state.selected or last_offset != state.offset or query.dirty;
-
-    return null;
 }
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
