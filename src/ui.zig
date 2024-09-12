@@ -365,7 +365,7 @@ pub fn run(
                 if (key.matches('c', .{ .ctrl = true })) {
                     return null;
                 } else if (key.matches('w', .{ .ctrl = true })) {
-                    if (state.query.len > 0) deleteWord(&state.query);
+                    if (state.query.len() > 0) deleteWord(&state.query);
                 } else if (key.matches('u', .{ .ctrl = true })) {
                     state.query.deleteTo(0);
                 } else if (key.matches(Key.backspace, .{})) {
@@ -373,7 +373,7 @@ pub fn run(
                 } else if (key.matches('a', .{ .ctrl = true })) {
                     state.query.setCursor(0);
                 } else if (key.matches('e', .{ .ctrl = true })) {
-                    state.query.setCursor(state.query.len);
+                    state.query.setCursor(state.query.len());
                 } else if (key.matches('d', .{ .ctrl = true })) {
                     state.query.delete(1, .right);
                 } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
@@ -385,7 +385,7 @@ pub fn run(
                 } else if (key.matches(Key.up, .{})) {
                     lineUp(&state);
                 } else if (key.matches('k', .{ .ctrl = true })) {
-                    if (vi_mode) lineUp(&state) else state.query.deleteTo(state.query.len);
+                    if (vi_mode) lineUp(&state) else state.query.deleteTo(state.query.len());
                 } else if (key.matches(Key.tab, .{ .shift = true })) {
                     try state.selected_rows.toggle(state.selected + state.offset);
                     lineUp(&state);
@@ -417,7 +417,7 @@ pub fn run(
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
 fn deleteWord(query: *EditBuffer) void {
-    var slice = query.slice()[0..query.cursorIndex()];
+    var slice = query.slice()[0..query.cursor];
     var end = slice.len - 1;
 
     // ignore trailing spaces or slashes
@@ -436,7 +436,7 @@ fn deleteWord(query: *EditBuffer) void {
     }
 
     if (last_index) |index| {
-        query.deleteTo(query.bufferIndexToCursor(index + 1));
+        query.deleteTo(index + 1);
     } else query.deleteTo(0);
 }
 
