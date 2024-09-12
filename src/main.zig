@@ -5,6 +5,7 @@ const opts = @import("opts.zig");
 const std = @import("std");
 const testing = std.testing;
 const ui = @import("ui.zig");
+const vaxis = @import("vaxis");
 
 const ArrayList = std.ArrayList;
 const Color = ui.Color;
@@ -14,6 +15,8 @@ pub const std_options = .{
 };
 
 const eql = std.mem.eql;
+
+pub const panic = vaxis.panic_handler;
 
 pub fn main() anyerror!void {
     // create an arena allocator to reduce time spent allocating
