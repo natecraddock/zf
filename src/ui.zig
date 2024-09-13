@@ -32,19 +32,6 @@ pub const Color = enum(u8) {
     bright_white = 15,
 };
 
-const State = struct {
-    max_height: usize,
-    selected: usize = 0,
-    selected_rows: ArrayToggleSet(usize),
-    offset: usize = 0,
-    prompt: []const u8,
-    query: EditBuffer,
-    case_sensitive: bool = false,
-    selection_changed: bool = false,
-    preview: ?Previewer = null,
-    preview_width: f64 = 0.6,
-};
-
 const HighlightSlicer = struct {
     matches: []const usize,
     highlight: bool,
@@ -266,6 +253,20 @@ pub fn hasUpper(query: []const u8) bool {
     }
     return false;
 }
+
+const State = struct {
+    max_height: usize,
+    selected: usize = 0,
+    selected_rows: ArrayToggleSet(usize),
+    offset: usize = 0,
+    prompt: []const u8,
+    query: EditBuffer,
+    case_sensitive: bool = false,
+    selection_changed: bool = false,
+
+    preview: ?Previewer = null,
+    preview_width: f64 = 0.6,
+};
 
 const Event = union(enum) {
     key_press: vaxis.Key,
