@@ -6,6 +6,7 @@ const process = std.process;
 const std = @import("std");
 
 const Allocator = mem.Allocator;
+const Color = @import("ui.zig").Color;
 const File = std.fs.File;
 
 const version = "0.9.2";
@@ -89,6 +90,7 @@ const OptionIter = struct {
 };
 
 pub const Config = struct {
+    // Commandline options
     keep_order: bool = false,
     height: usize = 10,
     filter: ?[]const u8 = null,
@@ -96,6 +98,11 @@ pub const Config = struct {
     delimiter: []const u8 = "\n",
     preview: ?[]const u8 = null,
     preview_width: f64 = 0.6,
+
+    // Environment variables
+    prompt: []const u8 = "",
+    vi_mode: bool = false,
+    highlight: ?Color = .cyan,
 };
 
 pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer) Config {

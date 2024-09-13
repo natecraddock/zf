@@ -6,6 +6,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
 const Candidate = filter.Candidate;
+const Config = @import("opts.zig").Config;
 const EditBuffer = @import("EditBuffer.zig");
 const Key = vaxis.Key;
 const Previewer = @import("Previewer.zig");
@@ -149,20 +150,17 @@ fn numDigits(number: usize) u16 {
 }
 
 fn draw(
-    vx: *vaxis.Vaxis,
     state: *State,
     tokens: [][]const u8,
     candidates: []Candidate,
     total_candidates: usize,
-    plain: bool,
-    color: ?Color,
 ) !void {
-    const win = vx.window();
+    const win = state.vx.window();
     win.clear();
 
-    const child = win.child(.{ .height = .{ .limit = state.max_height } });
+    const child = win.child(.{ .height = .{ .limit = state.config.height } });
 
-    const width = vx.screen.width;
+    const width = state.vx.screen.width;
     const preview_width: usize = if (state.preview) |_|
         @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
     else
@@ -170,7 +168,7 @@ fn draw(
     const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
     _ = items_width;
 
-    const height = @min(vx.screen.height, state.max_height);
+    const height = @min(state.vx.screen.height, state.config.height);
 
     // draw the candidates
     var line: usize = 0;
@@ -183,8 +181,8 @@ fn draw(
             state.selected_rows.contains(line + state.offset),
             line == state.selected,
             state.case_sensitive,
-            plain,
-            color,
+            state.config.plain,
+            state.config.highlight,
         );
     }
 
@@ -210,7 +208,7 @@ fn draw(
     // TODO: handle display of queries longer than the screen width
     // const query_width = state.query.slice().len;
     _ = try child.print(&.{
-        .{ .text = state.prompt },
+        .{ .text = state.config.prompt },
         .{ .text = state.query.slice() },
     }, .{ .col_offset = 0, .row_offset = 0 });
 
@@ -231,8 +229,8 @@ fn draw(
     //     terminal.sgr(.reset);
     // } else terminal.cursorDown(height);
 
-    const cursor_width = state.query.sliceRange(0, @min(width - state.prompt.len - stats_width - 1, state.query.cursor)).len;
-    child.showCursor(cursor_width + state.prompt.len, 0);
+    const cursor_width = state.query.sliceRange(0, @min(width - state.config.prompt.len - stats_width - 1, state.query.cursor)).len;
+    child.showCursor(cursor_width + state.config.prompt.len, 0);
 }
 
 /// split the query on spaces and return a slice of query tokens
@@ -254,167 +252,169 @@ pub fn hasUpper(query: []const u8) bool {
     return false;
 }
 
-const State = struct {
-    max_height: usize,
+pub const State = struct {
+    allocator: Allocator,
+    config: Config,
+
+    vx: vaxis.Vaxis,
+    tty: vaxis.Tty,
+
     selected: usize = 0,
     selected_rows: ArrayToggleSet(usize),
     offset: usize = 0,
-    prompt: []const u8,
     query: EditBuffer,
     case_sensitive: bool = false,
     selection_changed: bool = false,
 
     preview: ?Previewer = null,
     preview_width: f64 = 0.6,
+
+    pub fn init(allocator: Allocator, config: Config) !State {
+        const vx = try vaxis.init(allocator, .{});
+
+        return .{
+            .allocator = allocator,
+            .config = config,
+
+            .vx = vx,
+            .tty = try vaxis.Tty.init(),
+
+            .selected = 0,
+            .selected_rows = ArrayToggleSet(usize).init(allocator),
+            .offset = 0,
+            .query = EditBuffer.init(allocator),
+        };
+    }
+
+    pub fn deinit(state: *State) void {
+        // We must clear the window because we aren't using the alternate screen
+        state.vx.window().clear();
+        state.vx.render(state.tty.anyWriter()) catch {};
+
+        state.vx.deinit(null, state.tty.anyWriter());
+        state.tty.deinit();
+    }
+
+    pub fn run(
+        state: *State,
+        candidates: [][]const u8,
+    ) !?[]const []const u8 {
+        defer state.deinit();
+
+        var filtered = blk: {
+            var filtered = try ArrayList(Candidate).initCapacity(state.allocator, candidates.len);
+            for (candidates) |candidate| {
+                filtered.appendAssumeCapacity(.{ .str = candidate });
+            }
+            break :blk try filtered.toOwnedSlice();
+        };
+        const filtered_buf = try state.allocator.alloc(Candidate, candidates.len);
+
+        const tokens_buf = try state.allocator.alloc([]const u8, 16);
+        var tokens = splitQuery(tokens_buf, state.query.slice());
+
+        var loop: vaxis.Loop(Event) = .{
+            .tty = &state.tty,
+            .vaxis = &state.vx,
+        };
+        try loop.init();
+
+        try loop.start();
+        defer loop.stop();
+
+        {
+            // Get initial window size
+            const ws = try vaxis.Tty.getWinsize(state.tty.fd);
+            try state.vx.resize(state.allocator, state.tty.anyWriter(), ws);
+        }
+
+        while (true) {
+            if (state.query.dirty) {
+                state.query.dirty = false;
+
+                tokens = splitQuery(tokens_buf, state.query.slice());
+                state.case_sensitive = hasUpper(state.query.slice());
+
+                filtered = filter.rankCandidates(filtered_buf, candidates, tokens, state.config.keep_order, state.config.plain, state.case_sensitive);
+                state.selected = 0;
+                state.offset = 0;
+                state.selected_rows.clear();
+            }
+
+            // The selection changed and the child process should be respawned
+            // if (state.selection_changed) if (state.preview) |*preview| {
+            //     state.selection_changed = false;
+            //     if (filtered.len > 0) {
+            //         try preview.spawn(filtered[state.selected + state.offset].str);
+            //     } else try preview.reset();
+            // };
+
+            try draw(state, tokens, filtered, candidates.len);
+            try state.vx.render(state.tty.anyWriter());
+
+            const event = loop.nextEvent();
+            switch (event) {
+                .key_press => |key| {
+                    const visible_rows = @min(@min(state.config.height, state.vx.screen.height) - 1, filtered.len);
+
+                    if (key.matches('c', .{ .ctrl = true })) {
+                        return null;
+                    } else if (key.matches('w', .{ .ctrl = true })) {
+                        if (state.query.len() > 0) deleteWord(&state.query);
+                    } else if (key.matches('u', .{ .ctrl = true })) {
+                        state.query.deleteTo(0);
+                    } else if (key.matches(Key.backspace, .{})) {
+                        state.query.delete(1, .left);
+                    } else if (key.matches('a', .{ .ctrl = true })) {
+                        state.query.setCursor(0);
+                    } else if (key.matches('e', .{ .ctrl = true })) {
+                        state.query.setCursor(state.query.len());
+                    } else if (key.matches('d', .{ .ctrl = true })) {
+                        state.query.delete(1, .right);
+                    } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
+                        state.query.moveCursor(1, .right);
+                    } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
+                        state.query.moveCursor(1, .left);
+                    } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
+                        lineDown(state, visible_rows, filtered.len - visible_rows);
+                    } else if (key.matches(Key.up, .{})) {
+                        lineUp(state);
+                    } else if (key.matches('k', .{ .ctrl = true })) {
+                        if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.query.len());
+                    } else if (key.matches(Key.tab, .{ .shift = true })) {
+                        try state.selected_rows.toggle(state.selected + state.offset);
+                        lineUp(state);
+                    } else if (key.matches(Key.tab, .{})) {
+                        try state.selected_rows.toggle(state.selected + state.offset);
+                        lineDown(state, visible_rows, filtered.len - visible_rows);
+                    } else if (key.matches(Key.enter, .{})) {
+                        if (filtered.len == 0) return &.{};
+                        if (state.selected_rows.slice().len > 0) {
+                            var selected_buf = try state.allocator.alloc([]const u8, state.selected_rows.slice().len);
+                            for (state.selected_rows.slice(), 0..) |index, i| {
+                                selected_buf[i] = filtered[index].str;
+                            }
+                            return selected_buf;
+                        }
+                        var selected_buf = try state.allocator.alloc([]const u8, 1);
+                        selected_buf[0] = filtered[state.selected + state.offset].str;
+                        return selected_buf;
+                    } else if (key.matches(Key.escape, .{})) {
+                        return &.{};
+                    } else if (key.text) |text| {
+                        try state.query.insert(text);
+                    }
+                },
+                .winsize => |ws| try state.vx.resize(state.allocator, state.tty.anyWriter(), ws),
+            }
+        }
+    }
 };
 
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
 };
-
-pub fn run(
-    allocator: Allocator,
-    candidates: [][]const u8,
-    keep_order: bool,
-    plain: bool,
-    height: usize,
-    preview_cmd: ?[]const u8,
-    preview_width: f64,
-    prompt_str: []const u8,
-    vi_mode: bool,
-    highight_color: ?Color,
-) !?[]const []const u8 {
-    _ = preview_width;
-    _ = preview_cmd;
-    var filtered = blk: {
-        var filtered = try ArrayList(Candidate).initCapacity(allocator, candidates.len);
-        for (candidates) |candidate| {
-            filtered.appendAssumeCapacity(.{ .str = candidate });
-        }
-        break :blk try filtered.toOwnedSlice();
-    };
-    const filtered_buf = try allocator.alloc(Candidate, candidates.len);
-
-    var state = State{
-        .max_height = height,
-        .selected = 0,
-        .selected_rows = ArrayToggleSet(usize).init(allocator),
-        .offset = 0,
-        .prompt = prompt_str,
-        .query = EditBuffer.init(allocator),
-    };
-
-    const tokens_buf = try allocator.alloc([]const u8, 16);
-    var tokens = splitQuery(tokens_buf, state.query.slice());
-
-    var tty = try vaxis.Tty.init();
-    defer tty.deinit();
-
-    var vx = try vaxis.init(allocator, .{});
-    defer vx.deinit(null, tty.anyWriter());
-    defer {
-        // Clear the window before printing selected lines
-        vx.window().clear();
-        vx.render(tty.anyWriter()) catch unreachable;
-    }
-
-    var loop: vaxis.Loop(Event) = .{
-        .tty = &tty,
-        .vaxis = &vx,
-    };
-    try loop.init();
-
-    try loop.start();
-    defer loop.stop();
-
-    {
-        // Get initial window size
-        const ws = try vaxis.Tty.getWinsize(tty.fd);
-        try vx.resize(allocator, tty.anyWriter(), ws);
-    }
-
-    while (true) {
-        if (state.query.dirty) {
-            state.query.dirty = false;
-
-            tokens = splitQuery(tokens_buf, state.query.slice());
-            state.case_sensitive = hasUpper(state.query.slice());
-
-            filtered = filter.rankCandidates(filtered_buf, candidates, tokens, keep_order, plain, state.case_sensitive);
-            state.selected = 0;
-            state.offset = 0;
-            state.selected_rows.clear();
-        }
-
-        // The selection changed and the child process should be respawned
-        // if (state.selection_changed) if (state.preview) |*preview| {
-        //     state.selection_changed = false;
-        //     if (filtered.len > 0) {
-        //         try preview.spawn(filtered[state.selected + state.offset].str);
-        //     } else try preview.reset();
-        // };
-
-        try draw(&vx, &state, tokens, filtered, candidates.len, plain, highight_color);
-        try vx.render(tty.anyWriter());
-
-        const event = loop.nextEvent();
-        switch (event) {
-            .key_press => |key| {
-                const visible_rows = @min(@min(state.max_height, vx.screen.height) - 1, filtered.len);
-
-                if (key.matches('c', .{ .ctrl = true })) {
-                    return null;
-                } else if (key.matches('w', .{ .ctrl = true })) {
-                    if (state.query.len() > 0) deleteWord(&state.query);
-                } else if (key.matches('u', .{ .ctrl = true })) {
-                    state.query.deleteTo(0);
-                } else if (key.matches(Key.backspace, .{})) {
-                    state.query.delete(1, .left);
-                } else if (key.matches('a', .{ .ctrl = true })) {
-                    state.query.setCursor(0);
-                } else if (key.matches('e', .{ .ctrl = true })) {
-                    state.query.setCursor(state.query.len());
-                } else if (key.matches('d', .{ .ctrl = true })) {
-                    state.query.delete(1, .right);
-                } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
-                    state.query.moveCursor(1, .right);
-                } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
-                    state.query.moveCursor(1, .left);
-                } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
-                    lineDown(&state, visible_rows, filtered.len - visible_rows);
-                } else if (key.matches(Key.up, .{})) {
-                    lineUp(&state);
-                } else if (key.matches('k', .{ .ctrl = true })) {
-                    if (vi_mode) lineUp(&state) else state.query.deleteTo(state.query.len());
-                } else if (key.matches(Key.tab, .{ .shift = true })) {
-                    try state.selected_rows.toggle(state.selected + state.offset);
-                    lineUp(&state);
-                } else if (key.matches(Key.tab, .{})) {
-                    try state.selected_rows.toggle(state.selected + state.offset);
-                    lineDown(&state, visible_rows, filtered.len - visible_rows);
-                } else if (key.matches(Key.enter, .{})) {
-                    if (filtered.len == 0) return &.{};
-                    if (state.selected_rows.slice().len > 0) {
-                        var selected_buf = try allocator.alloc([]const u8, state.selected_rows.slice().len);
-                        for (state.selected_rows.slice(), 0..) |index, i| {
-                            selected_buf[i] = filtered[index].str;
-                        }
-                        return selected_buf;
-                    }
-                    var selected_buf = try allocator.alloc([]const u8, 1);
-                    selected_buf[0] = filtered[state.selected + state.offset].str;
-                    return selected_buf;
-                } else if (key.matches(Key.escape, .{})) {
-                    return &.{};
-                } else if (key.text) |text| {
-                    try state.query.insert(text);
-                }
-            },
-            .winsize => |ws| try vx.resize(allocator, tty.anyWriter(), ws),
-        }
-    }
-}
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
 fn deleteWord(query: *EditBuffer) void {

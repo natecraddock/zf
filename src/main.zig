@@ -29,7 +29,7 @@ pub fn main() anyerror!void {
     const allocator = arena.allocator();
 
     const args = try std.process.argsAlloc(allocator);
-    const config = opts.parse(allocator, args, stderr);
+    var config = opts.parse(allocator, args, stderr);
 
     // read all lines or exit on out of memory
     const buf = blk: {
@@ -65,36 +65,30 @@ pub fn main() anyerror!void {
             try stdout.print("{s}\n", .{candidate.str});
         }
     } else {
-        const prompt_str = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
-        const vi_mode = if (std.process.getEnvVarOwned(allocator, "ZF_VI_MODE")) |value| blk: {
+        config.prompt = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
+        config.vi_mode = if (std.process.getEnvVarOwned(allocator, "ZF_VI_MODE")) |value| blk: {
             break :blk value.len > 0;
         } else |_| false;
 
-        const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
-            break :blk value.len > 0;
-        } else |_| false;
+        {
+            const no_color = if (std.process.getEnvVarOwned(allocator, "NO_COLOR")) |value| blk: {
+                break :blk value.len > 0;
+            } else |_| false;
 
-        const highlight_color: Color = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
-            inline for (std.meta.fields(Color)) |field| {
-                if (eql(u8, value, field.name)) {
-                    break :blk @enumFromInt(field.value);
+            const highlight_color: Color = if (std.process.getEnvVarOwned(allocator, "ZF_HIGHLIGHT")) |value| blk: {
+                inline for (std.meta.fields(Color)) |field| {
+                    if (eql(u8, value, field.name)) {
+                        break :blk @enumFromInt(field.value);
+                    }
                 }
-            }
-            break :blk .cyan;
-        } else |_| .cyan;
+                break :blk .cyan;
+            } else |_| .cyan;
 
-        const selected = try ui.run(
-            allocator,
-            candidates,
-            config.keep_order,
-            config.plain,
-            config.height,
-            config.preview,
-            config.preview_width,
-            prompt_str,
-            vi_mode,
-            if (no_color) null else highlight_color,
-        );
+            config.highlight = if (no_color) null else highlight_color;
+        }
+
+        var state = try ui.State.init(allocator, config);
+        const selected = try state.run(candidates);
 
         if (selected) |selected_lines| {
             for (selected_lines) |str| {
