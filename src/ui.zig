@@ -399,7 +399,6 @@ pub const State = struct {
 
             var res = try win.printSegment(.{
                 .text = if (selected) "* " else "  ",
-                .style = .{ .reverse = highlight },
             }, .{
                 .row_offset = line,
                 .col_offset = 0,
