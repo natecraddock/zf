@@ -84,153 +84,9 @@ fn calculateHighlights(
     return matches[0..index];
 }
 
-fn drawCandidate(
-    win: vaxis.Window,
-    line: usize,
-    candidate: Candidate,
-    tokens: [][]const u8,
-    selected: bool,
-    highlight: bool,
-    case_sensitive: bool,
-    plain: bool,
-    color: ?Color,
-) void {
-    var matches_buf: [2048]usize = undefined;
-    const filename = if (plain) null else std.fs.path.basename(candidate.str);
-    const matches = calculateHighlights(candidate.str, filename, tokens, case_sensitive, plain, &matches_buf);
-
-    // no highlights, just output the string
-    if (matches.len == 0) {
-        _ = try win.print(&.{
-            .{ .text = if (selected) "* " else "  " },
-            .{
-                .text = candidate.str,
-                .style = .{ .reverse = highlight },
-            },
-        }, .{
-            .row_offset = line,
-            .col_offset = 0,
-            .wrap = .none,
-        });
-    } else {
-        var slicer = HighlightSlicer.init(candidate.str, matches);
-
-        var res = try win.printSegment(.{
-            .text = if (selected) "* " else "  ",
-            .style = .{ .reverse = highlight },
-        }, .{
-            .row_offset = line,
-            .col_offset = 0,
-            .wrap = .none,
-        });
-
-        while (slicer.next()) |slice| {
-            const highlight_style: vaxis.Style = .{
-                .reverse = highlight,
-                .fg = if (slice.highlight and color != null) .{
-                    .index = @intFromEnum(color.?),
-                } else .default,
-            };
-
-            res = try win.printSegment(.{
-                .text = slice.str,
-                .style = highlight_style,
-            }, .{
-                .row_offset = line,
-                .col_offset = res.col,
-                .wrap = .none,
-            });
-        }
-    }
-}
-
 fn numDigits(number: usize) u16 {
     if (number == 0) return 1;
     return @intCast(std.math.log10(number) + 1);
-}
-
-fn draw(
-    state: *State,
-    tokens: [][]const u8,
-    candidates: []Candidate,
-    total_candidates: usize,
-) !void {
-    const win = state.vx.window();
-    win.clear();
-
-    const child = win.child(.{ .height = .{ .limit = state.config.height } });
-
-    const width = state.vx.screen.width;
-    const preview_width: usize = if (state.preview) |_|
-        @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
-    else
-        0;
-    const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
-    _ = items_width;
-
-    const height = @min(state.vx.screen.height, state.config.height);
-
-    // draw the candidates
-    var line: usize = 0;
-    while (line < height - 1) : (line += 1) {
-        if (line < candidates.len) drawCandidate(
-            child,
-            line + 1,
-            candidates[line + state.offset],
-            tokens,
-            state.selected_rows.contains(line + state.offset),
-            line == state.selected,
-            state.case_sensitive,
-            state.config.plain,
-            state.config.highlight,
-        );
-    }
-
-    // draw the stats
-    const num_selected = state.selected_rows.slice().len;
-    const stats_width = blk: {
-        var buf: [32]u8 = undefined;
-
-        if (num_selected > 0) {
-            const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
-            const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
-            _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
-            break :blk stats_width;
-        } else {
-            const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
-            const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-            _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
-            break :blk stats_width;
-        }
-    };
-
-    // draw the prompt
-    // TODO: handle display of queries longer than the screen width
-    // const query_width = state.query.slice().len;
-    _ = try child.print(&.{
-        .{ .text = state.config.prompt },
-        .{ .text = state.query.slice() },
-    }, .{ .col_offset = 0, .row_offset = 0 });
-
-    // // draw a preview window if requested
-    // if (state.preview) |*preview| {
-    //     var lines = preview.lines();
-
-    //     for (0..height) |_| {
-    //         terminal.cursorCol(items_width + 2);
-    //         terminal.write("│ ");
-
-    //         if (lines.next()) |preview_line| {
-    //             terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
-    //         }
-
-    //         terminal.cursorDown(1);
-    //     }
-    //     terminal.sgr(.reset);
-    // } else terminal.cursorDown(height);
-
-    const cursor_width = state.query.sliceRange(0, @min(width - state.config.prompt.len - stats_width - 1, state.query.cursor)).len;
-    child.showCursor(cursor_width + state.config.prompt.len, 0);
 }
 
 /// split the query on spaces and return a slice of query tokens
@@ -286,7 +142,7 @@ pub const State = struct {
         };
     }
 
-    pub fn deinit(state: *State) void {
+    fn deinit(state: *State) void {
         // We must clear the window because we aren't using the alternate screen
         state.vx.window().clear();
         state.vx.render(state.tty.anyWriter()) catch {};
@@ -349,71 +205,230 @@ pub const State = struct {
             //     } else try preview.reset();
             // };
 
-            try draw(state, tokens, filtered, candidates.len);
+            try state.draw(tokens, filtered, candidates.len);
             try state.vx.render(state.tty.anyWriter());
 
-            const event = loop.nextEvent();
-            switch (event) {
-                .key_press => |key| {
-                    const visible_rows = @min(@min(state.config.height, state.vx.screen.height) - 1, filtered.len);
-
-                    if (key.matches('c', .{ .ctrl = true })) {
-                        return null;
-                    } else if (key.matches('w', .{ .ctrl = true })) {
-                        if (state.query.len() > 0) deleteWord(&state.query);
-                    } else if (key.matches('u', .{ .ctrl = true })) {
-                        state.query.deleteTo(0);
-                    } else if (key.matches(Key.backspace, .{})) {
-                        state.query.delete(1, .left);
-                    } else if (key.matches('a', .{ .ctrl = true })) {
-                        state.query.setCursor(0);
-                    } else if (key.matches('e', .{ .ctrl = true })) {
-                        state.query.setCursor(state.query.len());
-                    } else if (key.matches('d', .{ .ctrl = true })) {
-                        state.query.delete(1, .right);
-                    } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
-                        state.query.moveCursor(1, .right);
-                    } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
-                        state.query.moveCursor(1, .left);
-                    } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
-                        lineDown(state, visible_rows, filtered.len - visible_rows);
-                    } else if (key.matches(Key.up, .{})) {
-                        lineUp(state);
-                    } else if (key.matches('k', .{ .ctrl = true })) {
-                        if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.query.len());
-                    } else if (key.matches(Key.tab, .{ .shift = true })) {
-                        try state.selected_rows.toggle(state.selected + state.offset);
-                        lineUp(state);
-                    } else if (key.matches(Key.tab, .{})) {
-                        try state.selected_rows.toggle(state.selected + state.offset);
-                        lineDown(state, visible_rows, filtered.len - visible_rows);
-                    } else if (key.matches(Key.enter, .{})) {
-                        if (filtered.len == 0) return &.{};
-                        if (state.selected_rows.slice().len > 0) {
-                            var selected_buf = try state.allocator.alloc([]const u8, state.selected_rows.slice().len);
-                            for (state.selected_rows.slice(), 0..) |index, i| {
-                                selected_buf[i] = filtered[index].str;
-                            }
-                            return selected_buf;
-                        }
+            const possibleResult = try state.handleInput(&loop, filtered.len);
+            if (possibleResult) |result| {
+                switch (result) {
+                    .cancel => return null,
+                    .none => return &.{},
+                    .one => {
                         var selected_buf = try state.allocator.alloc([]const u8, 1);
                         selected_buf[0] = filtered[state.selected + state.offset].str;
                         return selected_buf;
-                    } else if (key.matches(Key.escape, .{})) {
-                        return &.{};
-                    } else if (key.text) |text| {
-                        try state.query.insert(text);
-                    }
-                },
-                .winsize => |ws| try state.vx.resize(state.allocator, state.tty.anyWriter(), ws),
+                    },
+                    .many => {
+                        var selected_buf = try state.allocator.alloc([]const u8, state.selected_rows.slice().len);
+                        for (state.selected_rows.slice(), 0..) |index, i| {
+                            selected_buf[i] = filtered[index].str;
+                        }
+                        return selected_buf;
+                    },
+                }
             }
         }
     }
-};
 
-const Event = union(enum) {
-    key_press: vaxis.Key,
-    winsize: vaxis.Winsize,
+    const Result = enum { cancel, none, one, many };
+
+    const Event = union(enum) {
+        key_press: vaxis.Key,
+        winsize: vaxis.Winsize,
+    };
+
+    fn handleInput(state: *State, loop: *vaxis.Loop(Event), num_filtered: usize) !?Result {
+        const event = loop.nextEvent();
+        switch (event) {
+            .key_press => |key| {
+                const visible_rows = @min(@min(state.config.height, state.vx.screen.height) - 1, num_filtered);
+
+                if (key.matches('c', .{ .ctrl = true })) {
+                    return .cancel;
+                } else if (key.matches('w', .{ .ctrl = true })) {
+                    if (state.query.len() > 0) deleteWord(&state.query);
+                } else if (key.matches('u', .{ .ctrl = true })) {
+                    state.query.deleteTo(0);
+                } else if (key.matches(Key.backspace, .{})) {
+                    state.query.delete(1, .left);
+                } else if (key.matches('a', .{ .ctrl = true })) {
+                    state.query.setCursor(0);
+                } else if (key.matches('e', .{ .ctrl = true })) {
+                    state.query.setCursor(state.query.len());
+                } else if (key.matches('d', .{ .ctrl = true })) {
+                    state.query.delete(1, .right);
+                } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
+                    state.query.moveCursor(1, .right);
+                } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
+                    state.query.moveCursor(1, .left);
+                } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
+                    lineDown(state, visible_rows, num_filtered - visible_rows);
+                } else if (key.matches(Key.up, .{})) {
+                    lineUp(state);
+                } else if (key.matches('k', .{ .ctrl = true })) {
+                    if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.query.len());
+                } else if (key.matches(Key.tab, .{ .shift = true })) {
+                    try state.selected_rows.toggle(state.selected + state.offset);
+                    lineUp(state);
+                } else if (key.matches(Key.tab, .{})) {
+                    try state.selected_rows.toggle(state.selected + state.offset);
+                    lineDown(state, visible_rows, num_filtered - visible_rows);
+                } else if (key.matches(Key.enter, .{})) {
+                    if (num_filtered == 0) return .none;
+                    if (state.selected_rows.slice().len > 0) {
+                        return .many;
+                    }
+                    return .one;
+                } else if (key.matches(Key.escape, .{})) {
+                    return .none;
+                } else if (key.text) |text| {
+                    try state.query.insert(text);
+                }
+            },
+            .winsize => |ws| try state.vx.resize(state.allocator, state.tty.anyWriter(), ws),
+        }
+
+        return null;
+    }
+
+    fn draw(
+        state: *State,
+        tokens: [][]const u8,
+        candidates: []Candidate,
+        total_candidates: usize,
+    ) !void {
+        const win = state.vx.window();
+        win.clear();
+
+        const child = win.child(.{ .height = .{ .limit = state.config.height } });
+
+        const width = state.vx.screen.width;
+        const preview_width: usize = if (state.preview) |_|
+            @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
+        else
+            0;
+        const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
+        _ = items_width;
+
+        const height = @min(state.vx.screen.height, state.config.height);
+
+        // draw the candidates
+        var line: usize = 0;
+        while (line < height - 1) : (line += 1) {
+            if (line < candidates.len) state.drawCandidate(
+                child,
+                line + 1,
+                candidates[line + state.offset],
+                tokens,
+                state.selected_rows.contains(line + state.offset),
+                line == state.selected,
+            );
+        }
+
+        // draw the stats
+        const num_selected = state.selected_rows.slice().len;
+        const stats_width = blk: {
+            var buf: [32]u8 = undefined;
+
+            if (num_selected > 0) {
+                const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
+                const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
+                _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
+                break :blk stats_width;
+            } else {
+                const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
+                const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
+                _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
+                break :blk stats_width;
+            }
+        };
+
+        // draw the prompt
+        // TODO: handle display of queries longer than the screen width
+        // const query_width = state.query.slice().len;
+        _ = try child.print(&.{
+            .{ .text = state.config.prompt },
+            .{ .text = state.query.slice() },
+        }, .{ .col_offset = 0, .row_offset = 0 });
+
+        // // draw a preview window if requested
+        // if (state.preview) |*preview| {
+        //     var lines = preview.lines();
+
+        //     for (0..height) |_| {
+        //         terminal.cursorCol(items_width + 2);
+        //         terminal.write("│ ");
+
+        //         if (lines.next()) |preview_line| {
+        //             terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
+        //         }
+
+        //         terminal.cursorDown(1);
+        //     }
+        //     terminal.sgr(.reset);
+        // } else terminal.cursorDown(height);
+
+        const cursor_width = state.query.sliceRange(0, @min(width - state.config.prompt.len - stats_width - 1, state.query.cursor)).len;
+        child.showCursor(cursor_width + state.config.prompt.len, 0);
+    }
+
+    fn drawCandidate(
+        state: *State,
+        win: vaxis.Window,
+        line: usize,
+        candidate: Candidate,
+        tokens: [][]const u8,
+        selected: bool,
+        highlight: bool,
+    ) void {
+        var matches_buf: [2048]usize = undefined;
+        const filename = if (state.config.plain) null else std.fs.path.basename(candidate.str);
+        const matches = calculateHighlights(candidate.str, filename, tokens, state.case_sensitive, state.config.plain, &matches_buf);
+
+        // no highlights, just output the string
+        if (matches.len == 0) {
+            _ = try win.print(&.{
+                .{ .text = if (selected) "* " else "  " },
+                .{
+                    .text = candidate.str,
+                    .style = .{ .reverse = highlight },
+                },
+            }, .{
+                .row_offset = line,
+                .col_offset = 0,
+                .wrap = .none,
+            });
+        } else {
+            var slicer = HighlightSlicer.init(candidate.str, matches);
+
+            var res = try win.printSegment(.{
+                .text = if (selected) "* " else "  ",
+                .style = .{ .reverse = highlight },
+            }, .{
+                .row_offset = line,
+                .col_offset = 0,
+                .wrap = .none,
+            });
+
+            while (slicer.next()) |slice| {
+                const highlight_style: vaxis.Style = .{
+                    .reverse = highlight,
+                    .fg = if (slice.highlight and state.config.highlight != null) .{
+                        .index = @intFromEnum(state.config.highlight.?),
+                    } else .default,
+                };
+
+                res = try win.printSegment(.{
+                    .text = slice.str,
+                    .style = highlight_style,
+                }, .{
+                    .row_offset = line,
+                    .col_offset = res.col,
+                    .wrap = .none,
+                });
+            }
+        }
+    }
 };
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
