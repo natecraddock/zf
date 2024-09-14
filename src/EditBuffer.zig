@@ -33,10 +33,6 @@ pub fn slice(eb: *EditBuffer) []const u8 {
     return eb.buffer.items;
 }
 
-pub fn sliceRange(eb: *EditBuffer, start: usize, end: usize) []const u8 {
-    return eb.buffer.items[start..end];
-}
-
 /// Insert utf-8 encoded text into the buffer at the cursor position
 pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
     try eb.buffer.insertSlice(eb.cursor, bytes);

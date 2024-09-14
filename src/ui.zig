@@ -327,21 +327,18 @@ pub const State = struct {
 
         // draw the stats
         const num_selected = state.selected_rows.slice().len;
-        const stats_width = blk: {
+        {
             var buf: [32]u8 = undefined;
-
             if (num_selected > 0) {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
                 _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
-                break :blk stats_width;
             } else {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
                 _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
-                break :blk stats_width;
             }
-        };
+        }
 
         // draw the prompt
         // TODO: handle display of queries longer than the screen width
@@ -368,8 +365,7 @@ pub const State = struct {
         //     terminal.sgr(.reset);
         // } else terminal.cursorDown(height);
 
-        const cursor_width = state.query.sliceRange(0, @min(width - state.config.prompt.len - stats_width - 1, state.query.cursor)).len;
-        child.showCursor(cursor_width + state.config.prompt.len, 0);
+        child.showCursor(state.config.prompt.len + state.query.cursor, 0);
     }
 
     fn drawCandidate(
