@@ -2,7 +2,6 @@
 
 const mem = std.mem;
 const os = std.os;
-const posix = std.posix;
 const process = std.process;
 const std = @import("std");
 
@@ -23,7 +22,7 @@ child: ?Child = null,
 stdout: ArrayList(u8),
 stderr: ArrayList(u8),
 
-pub fn init(allocator: Allocator, cmd: []const u8, arg: []const u8) !Previewer {
+pub fn init(allocator: Allocator, cmd: []const u8) Previewer {
     const shell = process.getEnvVarOwned(allocator, "SHELL") catch "/bin/sh";
 
     var iter = std.mem.tokenizeSequence(u8, cmd, "{}");
@@ -32,16 +31,13 @@ pub fn init(allocator: Allocator, cmd: []const u8, arg: []const u8) !Previewer {
         iter.next() orelse "",
     };
 
-    var previewer = Previewer{
+    return .{
         .allocator = allocator,
         .shell = shell,
         .cmd_parts = cmd_parts,
         .stdout = ArrayList(u8).init(allocator),
         .stderr = ArrayList(u8).init(allocator),
     };
-    try previewer.spawn(arg);
-
-    return previewer;
 }
 
 pub fn reset(previewer: *Previewer) !void {
@@ -49,7 +45,6 @@ pub fn reset(previewer: *Previewer) !void {
     previewer.stderr.clearRetainingCapacity();
     if (previewer.child) |*child| {
         _ = try child.kill();
-        previewer.loop.clearChild();
     }
 }
 
@@ -61,7 +56,7 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
 
     try previewer.reset();
 
-    const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s} | expand -t4", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
+    const command = try std.fmt.allocPrint(previewer.allocator, "{s}{s}{s}", .{ previewer.cmd_parts[0], arg, previewer.cmd_parts[1] });
 
     var child = Child.init(&.{ previewer.shell, "-c", command }, previewer.allocator);
     child.stdin_behavior = .Close;
@@ -69,17 +64,6 @@ pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
     child.stderr_behavior = .Pipe;
     try child.spawn();
 
-    _ = try posix.fcntl(child.stdout.?.handle, posix.F.SETFL, @as(
-        u32,
-        @bitCast(posix.O{ .NONBLOCK = true }),
-    ));
-    _ = try posix.fcntl(
-        child.stderr.?.handle,
-        posix.F.SETFL,
-        @as(u32, @bitCast(posix.O{ .NONBLOCK = true })),
-    );
-
-    previewer.loop.setChild(child.stdout.?.handle, child.stderr.?.handle);
     previewer.child = child;
     previewer.current_arg = try previewer.allocator.dupe(u8, arg);
 }
@@ -98,7 +82,6 @@ pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !bool {
         if (len == 0) {
             _ = try child.kill();
             previewer.child = null;
-            previewer.loop.clearChild();
             return false;
         }
 
@@ -116,13 +99,14 @@ pub fn read(previewer: *Previewer, stream: enum { stdout, stderr }) !bool {
         if (buf_len > 4096 * 10) {
             _ = try child.kill();
             previewer.child = null;
-            previewer.loop.clearChild();
         }
     }
     return true;
 }
 
 pub fn lines(previewer: *Previewer) std.mem.SplitIterator(u8, .scalar) {
+    _ = previewer.read(.stdout) catch {};
+
     if (previewer.stderr.items.len > 0) {
         return std.mem.splitScalar(u8, previewer.stderr.items, '\n');
     }

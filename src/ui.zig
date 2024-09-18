@@ -128,6 +128,10 @@ pub const State = struct {
     pub fn init(allocator: Allocator, config: Config) !State {
         const vx = try vaxis.init(allocator, .{});
 
+        const preview = if (config.preview) |cmd| blk: {
+            break :blk Previewer.init(allocator, cmd);
+        } else null;
+
         return .{
             .allocator = allocator,
             .config = config,
@@ -139,6 +143,8 @@ pub const State = struct {
             .selected_rows = ArrayToggleSet(usize).init(allocator),
             .offset = 0,
             .query = EditBuffer.init(allocator),
+
+            .preview = preview,
         };
     }
 
@@ -198,12 +204,12 @@ pub const State = struct {
             }
 
             // The selection changed and the child process should be respawned
-            // if (state.selection_changed) if (state.preview) |*preview| {
-            //     state.selection_changed = false;
-            //     if (filtered.len > 0) {
-            //         try preview.spawn(filtered[state.selected + state.offset].str);
-            //     } else try preview.reset();
-            // };
+            if (state.selection_changed or true) if (state.preview) |*preview| {
+                state.selection_changed = false;
+                if (filtered.len > 0) {
+                    try preview.spawn(filtered[state.selected + state.offset].str);
+                } else try preview.reset();
+            };
 
             try state.draw(tokens, filtered, candidates.len);
             try state.vx.render(state.tty.anyWriter());
@@ -300,15 +306,14 @@ pub const State = struct {
         const win = state.vx.window();
         win.clear();
 
-        const child = win.child(.{ .height = .{ .limit = state.config.height } });
-
         const width = state.vx.screen.width;
         const preview_width: usize = if (state.preview) |_|
             @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
         else
             0;
-        const items_width = width - preview_width - @as(usize, if (state.preview) |_| 2 else 0);
-        _ = items_width;
+
+        const items_width = width - preview_width;
+        const items = win.child(.{ .height = .{ .limit = state.config.height }, .width = .{ .limit = items_width } });
 
         const height = @min(state.vx.screen.height, state.config.height);
 
@@ -316,7 +321,7 @@ pub const State = struct {
         var line: usize = 0;
         while (line < height - 1) : (line += 1) {
             if (line < candidates.len) state.drawCandidate(
-                child,
+                items,
                 line + 1,
                 candidates[line + state.offset],
                 tokens,
@@ -332,40 +337,45 @@ pub const State = struct {
             if (num_selected > 0) {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
-                _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
+                _ = try items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
             } else {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-                _ = try child.printSegment(.{ .text = stats }, .{ .col_offset = width - stats_width, .row_offset = 0 });
+                _ = try items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
             }
         }
 
         // draw the prompt
         // TODO: handle display of queries longer than the screen width
         // const query_width = state.query.slice().len;
-        _ = try child.print(&.{
+        _ = try items.print(&.{
             .{ .text = state.config.prompt },
             .{ .text = state.query.slice() },
         }, .{ .col_offset = 0, .row_offset = 0 });
 
-        // // draw a preview window if requested
-        // if (state.preview) |*preview| {
-        //     var lines = preview.lines();
+        // draw a preview window if requested
+        if (state.preview) |*preview| {
+            const preview_win = win.child(.{
+                .x_off = items_width,
+                .y_off = 0,
+                .height = .{ .limit = state.config.height },
+                .width = .{ .limit = preview_width },
+                .border = .{ .where = .left },
+            });
 
-        //     for (0..height) |_| {
-        //         terminal.cursorCol(items_width + 2);
-        //         terminal.write("│ ");
+            var lines = preview.lines();
 
-        //         if (lines.next()) |preview_line| {
-        //             terminal.write(preview_line[0..@min(preview_line.len, preview_width - 1)]);
-        //         }
+            for (0..height) |l| {
+                if (lines.next()) |preview_line| {
+                    _ = try preview_win.printSegment(
+                        .{ .text = preview_line },
+                        .{ .row_offset = l, .wrap = .none },
+                    );
+                }
+            }
+        }
 
-        //         terminal.cursorDown(1);
-        //     }
-        //     terminal.sgr(.reset);
-        // } else terminal.cursorDown(height);
-
-        child.showCursor(state.config.prompt.len + state.query.cursor, 0);
+        items.showCursor(state.config.prompt.len + state.query.cursor, 0);
     }
 
     fn drawCandidate(

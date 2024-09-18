@@ -158,23 +158,23 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
         }
 
         // preview
-        // else if (mem.eql(u8, opt, "preview")) {
-        //     const command = iter.getArg() orelse missingArg(stderr, iter, opt);
-        //     config.preview = allocator.dupe(u8, command) catch unreachable;
-        // }
+        else if (mem.eql(u8, opt, "preview")) {
+            const command = iter.getArg() orelse missingArg(stderr, iter, opt);
+            config.preview = allocator.dupe(u8, command) catch unreachable;
+        }
 
         // preview-width
-        // else if (mem.eql(u8, opt, "preview-width")) {
-        //     const width_str = blk: {
-        //         const arg = iter.getArg() orelse missingArg(stderr, iter, opt);
-        //         if (mem.endsWith(u8, arg, "%")) break :blk arg[0 .. arg.len - 1];
-        //         break :blk arg;
-        //     };
-        //     const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "preview-width must be an integer");
-        //     if (preview_width < 20 or preview_width > 80) argError(stderr, "preview-width must be between 20% and 80%");
+        else if (mem.eql(u8, opt, "preview-width")) {
+            const width_str = blk: {
+                const arg = iter.getArg() orelse missingArg(stderr, iter, opt);
+                if (mem.endsWith(u8, arg, "%")) break :blk arg[0 .. arg.len - 1];
+                break :blk arg;
+            };
+            const preview_width = fmt.parseUnsigned(usize, width_str, 10) catch argError(stderr, "preview-width must be an integer");
+            if (preview_width < 20 or preview_width > 80) argError(stderr, "preview-width must be between 20% and 80%");
 
-        //     config.preview_width = @as(f64, @floatFromInt(preview_width)) / 100.0;
-        // }
+            config.preview_width = @as(f64, @floatFromInt(preview_width)) / 100.0;
+        }
 
         // invalid option
         else {
