@@ -120,7 +120,7 @@ pub const State = struct {
     offset: usize = 0,
     query: EditBuffer,
     case_sensitive: bool = false,
-    selection_changed: bool = false,
+    selection_changed: bool = true,
 
     preview: ?Previewer = null,
     preview_width: f64 = 0.6,
@@ -129,7 +129,7 @@ pub const State = struct {
         const vx = try vaxis.init(allocator, .{});
 
         const preview = if (config.preview) |cmd| blk: {
-            break :blk Previewer.init(allocator, cmd);
+            break :blk Previewer.init(cmd);
         } else null;
 
         return .{
@@ -184,6 +184,8 @@ pub const State = struct {
         try loop.start();
         defer loop.stop();
 
+        if (state.preview) |*preview| try preview.startThread(&loop);
+
         {
             // Get initial window size
             const ws = try vaxis.Tty.getWinsize(state.tty.fd);
@@ -204,15 +206,14 @@ pub const State = struct {
             }
 
             // The selection changed and the child process should be respawned
-            if (state.selection_changed or true) if (state.preview) |*preview| {
+            if (state.selection_changed) if (state.preview) |*preview| {
                 state.selection_changed = false;
                 if (filtered.len > 0) {
                     try preview.spawn(filtered[state.selected + state.offset].str);
-                } else try preview.reset();
+                } else preview.output = "";
             };
 
             try state.draw(tokens, filtered, candidates.len);
-            try state.vx.render(state.tty.anyWriter());
 
             const possibleResult = try state.handleInput(&loop, filtered.len);
             if (possibleResult) |result| {
@@ -238,12 +239,15 @@ pub const State = struct {
 
     const Result = enum { cancel, none, one, many };
 
-    const Event = union(enum) {
+    pub const Event = union(enum) {
         key_press: vaxis.Key,
         winsize: vaxis.Winsize,
+        preview_ready,
     };
 
     fn handleInput(state: *State, loop: *vaxis.Loop(Event), num_filtered: usize) !?Result {
+        const old = state.*;
+
         const event = loop.nextEvent();
         switch (event) {
             .key_press => |key| {
@@ -292,7 +296,12 @@ pub const State = struct {
                 }
             },
             .winsize => |ws| try state.vx.resize(state.allocator, state.tty.anyWriter(), ws),
+            .preview_ready => {
+                // will cause a re-render once the preview output is collected
+            },
         }
+
+        state.selection_changed = state.query.dirty or (old.selected != state.selected) or (old.offset != state.offset);
 
         return null;
     }
@@ -363,8 +372,7 @@ pub const State = struct {
                 .border = .{ .where = .left },
             });
 
-            var lines = preview.lines();
-
+            var lines = std.mem.splitScalar(u8, preview.output, '\n');
             for (0..height) |l| {
                 if (lines.next()) |preview_line| {
                     _ = try preview_win.printSegment(
@@ -376,6 +384,7 @@ pub const State = struct {
         }
 
         items.showCursor(state.config.prompt.len + state.query.cursor, 0);
+        try state.vx.render(state.tty.anyWriter());
     }
 
     fn drawCandidate(
