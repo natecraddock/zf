@@ -80,12 +80,12 @@ fn threadLoop(previewer: *Previewer, loop: *vaxis.Loop(Event)) !void {
         });
         defer poller.deinit();
 
-        const max_output_bytes = 4096 * 10;
+        const max_output_bytes = 4096 * 4;
         while (try poller.poll()) {
             if (poller.fifo(.stdout).count > max_output_bytes) break;
             if (poller.fifo(.stderr).count > max_output_bytes) break;
         }
-        _ = try child.wait();
+        _ = try child.kill();
 
         // Because zf uses an arena allocator for everything, this could possibly grow to
         // use a lot of memory. But zf is a short-lived process so this should be fine.
@@ -93,6 +93,10 @@ fn threadLoop(previewer: *Previewer, loop: *vaxis.Loop(Event)) !void {
             previewer.output = try poller.fifo(.stderr).toOwnedSlice();
         } else {
             previewer.output = try poller.fifo(.stdout).toOwnedSlice();
+        }
+
+        if (!std.unicode.utf8ValidateSlice(previewer.output)) {
+            previewer.output = "Invalid utf8";
         }
 
         previewer.last_arg = try allocator.dupe(u8, previewer.arg);
