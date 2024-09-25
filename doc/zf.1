@@ -57,6 +57,14 @@ Treat input as plaintext and disable filepath matching features. Useful when the
 file paths.
 .
 .TP
+.BR \-\-preview
+Executes a command substituting {} with the current selected line and displays the output in a side column.
+.
+.TP
+.BR \-\-preview-width
+Sets the preview column width (default 60%).
+.
+.TP
 .BR \-v ", " \-\-version
 Show version information and exit
 .
@@ -153,6 +161,10 @@ Fuzzy find on the file tree and open the selcted file in vim
 .TP
 .BR "git switch $(git branch | cut -c 3- | zf)"
 Switch to selected git branch
+.
+.TP
+.BR "find -type f | zf --preview 'cat {}'"
+Fuzzy find files and show a preview of the contents using cat
 
 .SH EXIT STATUS
 

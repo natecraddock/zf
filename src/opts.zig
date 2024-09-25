@@ -22,6 +22,8 @@ const help =
     \\-k, --keep-order           Don't sort by rank and preserve order of lines read on stdin
     \\-l, --lines LINES          Alias of --height (deprecated)
     \\-p, --plain                Treat input as plaintext and disable filepath matching features
+    \\    --preview COMMAND      Execute COMMAND substituting {} with the selected line and display the output in a side column.
+    \\    --preview-width WIDTH  Set the preview column width (default 60%)
     \\-v, --version              Show version information and exit
     \\-h, --help                 Display this help and exit
 ;

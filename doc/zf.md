@@ -30,6 +30,10 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 
 `-p, --plain`: Treat input as plaintext and disable filepath matching features. Useful when the input lines are not file paths.
 
+`--preview`: Executes a command substituting {} with the current selected line and displays the output in a side column.
+
+`--preview-width`: Sets the preview column width (default 60%).
+
 `-v, --version`: Show version information and exit
 
 `-h, --help`: Display help and exit
@@ -83,6 +87,8 @@ Matching is case insensitive unless an uppercase letter is found in the query.
 `vim $(find -type f | zf)` : Fuzzy find on the file tree and open the selcted file in vim
 
 `git switch $(git branch | cut -c 3- | zf)` : Switch to selected git branch
+
+`find -type f | zf --preview 'cat {}'`: Fuzzy find files and show a preview of the contents using cat
 
 ## EXIT STATUS
 
