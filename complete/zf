@@ -17,6 +17,11 @@ _zf() {
             return 0
             ;;
 
+        --preview-width)
+            COMPREPLY=( $(compgen -W "number" -- $cur) )
+            return 0
+            ;;
+
         --filter|-f)
 
             return 0
@@ -27,7 +32,7 @@ _zf() {
     # option completions
     case $cur in
         --*)
-            COMPREPLY=( $( compgen -W "--delimiter --filter --height --keep-order --lines --plain --version --help" -- "$cur" ) )
+            COMPREPLY=( $( compgen -W "--delimiter --filter --height --keep-order --lines --plain --preview --preview-width --version --help" -- "$cur" ) )
             return 0
             ;;
 

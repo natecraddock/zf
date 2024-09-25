@@ -7,5 +7,7 @@ complete -f -c zf -l height -d "The height of the interface in rows (default 10)
 complete -f -c zf -s k -l keep-order -d "Don't sort by rank and preserve order of lines read on stdin"
 complete -x -c zf -s l -l lines -d "Alias of --height (deprecated)"
 complete -f -c zf -s p -l plain -d "Treat input as plaintext and disable filepath matching features"
+complete -f -c zf -l preview -d "Execute COMMAND substituting {} with the selected line and display the output in a side column"
+complete -f -c zf -l preview-width -d "Set the preview column width (default 60%)"
 complete -f -c zf -s v -l version -d "Show version information and exit"
 complete -f -c zf -s h -l help -d "Display this help and exit"
