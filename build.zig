@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    tests.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
 
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run tests");

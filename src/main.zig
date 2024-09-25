@@ -131,4 +131,5 @@ test {
     _ = @import("lib.zig");
     _ = @import("opts.zig");
     _ = @import("ui.zig");
+    _ = @import("Previewer.zig");
 }

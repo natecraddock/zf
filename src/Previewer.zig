@@ -104,7 +104,29 @@ fn threadLoop(previewer: *Previewer, loop: *vaxis.Loop(Event)) !void {
     }
 }
 
-pub fn spawn(previewer: *Previewer, arg: []const u8) !void {
+pub fn spawn(previewer: *Previewer, arg: []const u8) void {
     previewer.arg = arg;
     previewer.semaphore.post();
+}
+
+const testing = std.testing;
+
+test Previewer {
+    // dummy loop for testing
+    var loop = vaxis.Loop(Event){
+        .tty = undefined,
+        .vaxis = undefined,
+    };
+
+    // create a previewer in a different thread
+    var previewer = Previewer.init("echo foo {} baz");
+    try previewer.startThread(&loop);
+
+    // send a message to that thread to spawn a child process
+    previewer.spawn("bar");
+
+    // wait for the child to finish and see if the output was as expected
+    const event = loop.nextEvent();
+    try testing.expectEqual(.preview_ready, event);
+    try testing.expectEqualStrings("foo bar baz\n", previewer.output);
 }

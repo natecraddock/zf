@@ -208,7 +208,7 @@ pub const State = struct {
             if (state.selection_changed) if (state.preview) |*preview| {
                 state.selection_changed = false;
                 if (filtered.len > 0) {
-                    try preview.spawn(filtered[state.selected + state.offset].str);
+                    preview.spawn(filtered[state.selected + state.offset].str);
                 } else preview.output = "";
             };
 
