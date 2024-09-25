@@ -123,7 +123,6 @@ pub const State = struct {
     selection_changed: bool = true,
 
     preview: ?Previewer = null,
-    preview_width: f64 = 0.6,
 
     pub fn init(allocator: Allocator, config: Config) !State {
         const vx = try vaxis.init(allocator, .{});
@@ -317,7 +316,7 @@ pub const State = struct {
 
         const width = state.vx.screen.width;
         const preview_width: usize = if (state.preview) |_|
-            @intFromFloat(@as(f64, @floatFromInt(width)) * state.preview_width)
+            @intFromFloat(@as(f64, @floatFromInt(width)) * state.config.preview_width)
         else
             0;
 
