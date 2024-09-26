@@ -88,7 +88,7 @@ pub fn rank(
 
     var index: usize = 0;
     for (candidates) |candidate| {
-        if (zf.rank(candidate, tokens, case_sensitive, plain)) |r| {
+        if (zf.rank(candidate, tokens, .{ .case_sensitive = case_sensitive, .plain = plain })) |r| {
             ranked[index] = .{ .str = candidate, .rank = r };
             index += 1;
         }
