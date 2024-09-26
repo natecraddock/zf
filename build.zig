@@ -4,6 +4,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const pie = b.option(bool, "pie", "Build a Position Independent Executable");
+
     // Expose zf as a Zig module
     const zf_module = b.addModule("zf", .{
         .root_source_file = b.path("src/zf/zf.zig"),
@@ -23,6 +25,7 @@ pub fn build(b: *std.Build) void {
 
     tui.root_module.addImport("zf", zf_module);
     tui.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
+    tui.pie = pie;
 
     b.installArtifact(tui);
 
