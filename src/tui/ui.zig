@@ -66,6 +66,10 @@ const HighlightSlicer = struct {
     }
 };
 
+// Maybe all that needs to be done is to sort the highlight integers? That would probably save some work in implementation
+// Or maybe could sort and then make ranges out of the pairs? Return a list of ranges?
+// for the Zig api that could be reasonable... but the C api maybe not
+// sorting as a minimum for sure
 fn calculateHighlights(
     str: []const u8,
     filenameOrNull: ?[]const u8,

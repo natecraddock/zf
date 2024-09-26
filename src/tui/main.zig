@@ -125,10 +125,8 @@ pub fn readAll(allocator: std.mem.Allocator, reader: *std.fs.File.Reader) ![]u8 
 
 test {
     _ = @import("array_toggle_set.zig");
-    _ = @import("clib.zig");
     _ = @import("EditBuffer.zig");
     _ = @import("filter.zig");
-    _ = @import("lib.zig");
     _ = @import("opts.zig");
     _ = @import("ui.zig");
     _ = @import("Previewer.zig");

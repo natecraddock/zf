@@ -110,3 +110,7 @@ test "highlight library interface" {
     try testing.expectEqualSlices(usize, &.{}, highlight("a", &.{""}, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlightToken("a", null, "", false, false, &matches_buf));
 }
+
+test {
+    _ = @import("clib.zig");
+}
