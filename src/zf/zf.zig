@@ -1,6 +1,15 @@
+//! zf.zig
+//! The zf fuzzy finding algorithm
+//! Inspired by https://github.com/garybernhardt/selecta
+
 const filter = @import("filter.zig");
 const std = @import("std");
 const testing = std.testing;
+
+test {
+    _ = @import("clib.zig");
+    _ = @import("filter.zig");
+}
 
 /// rank a given string against a slice of tokens
 pub fn rank(
@@ -9,7 +18,20 @@ pub fn rank(
     case_sensitive: bool,
     plain: bool,
 ) ?f64 {
-    return filter.rankCandidate(str, tokens, case_sensitive, plain);
+    const filename = if (plain) null else std.fs.path.basename(str);
+
+    // the candidate must contain all of the characters (in order) in each token.
+    // each tokens rank is summed. if any token does not match the candidate is ignored
+    var sum: f64 = 0;
+    for (tokens) |token| {
+        const strict_path = !plain and filter.hasSeparator(token);
+        if (rankToken(str, filename, token, case_sensitive, strict_path)) |r| {
+            sum += r;
+        } else return null;
+    }
+
+    // all tokens matched and the best ranks for each tokens are summed
+    return sum;
 }
 
 /// rank a given string against a single token
@@ -45,6 +67,11 @@ test "rank library interface" {
     try testing.expect(rankToken("a", null, "", false, false) == null);
 }
 
+// Maybe all that needs to be done is to sort the highlight integers? That would probably save some work in implementation
+// Or maybe could sort and then make ranges out of the pairs? Return a list of ranges?
+// for the Zig api that could be reasonable... but the C api maybe not
+// sorting as a minimum for sure
+
 /// compute matching ranges given a string and a slice of tokens
 pub fn highlight(
     str: []const u8,
@@ -57,7 +84,7 @@ pub fn highlight(
 
     var index: usize = 0;
     for (tokens) |token| {
-        const strict_path = filter.hasSeparator(token);
+        const strict_path = !plain and filter.hasSeparator(token);
         const matched = filter.highlightToken(str, filename, token, case_sensitive, strict_path, matches[index..]);
         index += matched.len;
     }
@@ -109,8 +136,4 @@ test "highlight library interface" {
     try testing.expectEqualSlices(usize, &.{}, highlightToken("", null, "a", false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlight("a", &.{""}, false, false, &matches_buf));
     try testing.expectEqualSlices(usize, &.{}, highlightToken("a", null, "", false, false, &matches_buf));
-}
-
-test {
-    _ = @import("clib.zig");
 }

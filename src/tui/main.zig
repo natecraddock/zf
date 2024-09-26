@@ -1,4 +1,4 @@
-const filter = @import("filter.zig");
+const candidate = @import("candidate.zig");
 const heap = std.heap;
 const io = std.io;
 const opts = @import("opts.zig");
@@ -8,6 +8,7 @@ const ui = @import("ui.zig");
 const vaxis = @import("vaxis");
 
 const ArrayList = std.ArrayList;
+const Candidate = candidate.Candidate;
 const Color = ui.Color;
 
 pub const std_options = .{
@@ -49,7 +50,7 @@ pub fn main() anyerror!void {
         }
     };
 
-    const candidates = try filter.collectCandidates(allocator, buf, delimiter);
+    const candidates = try candidate.collect(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 
     if (config.filter) |query| {
@@ -58,11 +59,11 @@ pub fn main() anyerror!void {
         const tokens_buf = try allocator.alloc([]const u8, 16);
         const tokens = ui.splitQuery(tokens_buf, query);
         const case_sensitive = ui.hasUpper(query);
-        const filtered_buf = try allocator.alloc(filter.Candidate, candidates.len);
-        const filtered = filter.rankCandidates(filtered_buf, candidates, tokens, config.keep_order, config.plain, case_sensitive);
+        const filtered_buf = try allocator.alloc(Candidate, candidates.len);
+        const filtered = candidate.rank(filtered_buf, candidates, tokens, config.keep_order, config.plain, case_sensitive);
         if (filtered.len == 0) std.process.exit(1);
-        for (filtered) |candidate| {
-            try stdout.print("{s}\n", .{candidate.str});
+        for (filtered) |c| {
+            try stdout.print("{s}\n", .{c.str});
         }
     } else {
         config.prompt = std.process.getEnvVarOwned(allocator, "ZF_PROMPT") catch "> ";
@@ -126,7 +127,7 @@ pub fn readAll(allocator: std.mem.Allocator, reader: *std.fs.File.Reader) ![]u8 
 test {
     _ = @import("array_toggle_set.zig");
     _ = @import("EditBuffer.zig");
-    _ = @import("filter.zig");
+    _ = @import("candidate.zig");
     _ = @import("opts.zig");
     _ = @import("ui.zig");
     _ = @import("Previewer.zig");

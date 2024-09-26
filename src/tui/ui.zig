@@ -1,11 +1,12 @@
-const filter = @import("filter.zig");
+const candidate = @import("candidate.zig");
 const std = @import("std");
 const vaxis = @import("vaxis");
+const zf = @import("zf");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ArrayToggleSet = @import("array_toggle_set.zig").ArrayToggleSet;
-const Candidate = filter.Candidate;
+const Candidate = candidate.Candidate;
 const Config = @import("opts.zig").Config;
 const EditBuffer = @import("EditBuffer.zig");
 const Key = vaxis.Key;
@@ -65,28 +66,6 @@ const HighlightSlicer = struct {
         return slice;
     }
 };
-
-// Maybe all that needs to be done is to sort the highlight integers? That would probably save some work in implementation
-// Or maybe could sort and then make ranges out of the pairs? Return a list of ranges?
-// for the Zig api that could be reasonable... but the C api maybe not
-// sorting as a minimum for sure
-fn calculateHighlights(
-    str: []const u8,
-    filenameOrNull: ?[]const u8,
-    tokens: [][]const u8,
-    case_sensitive: bool,
-    plain: bool,
-    matches: []usize,
-) []usize {
-    var index: usize = 0;
-    for (tokens) |token| {
-        const strict_path = !plain and filter.hasSeparator(token);
-        const matched = filter.highlightToken(str, filenameOrNull, token, case_sensitive, strict_path, matches[index..]);
-        index += matched.len;
-    }
-
-    return matches[0..index];
-}
 
 fn numDigits(number: usize) u16 {
     if (number == 0) return 1;
@@ -168,8 +147,8 @@ pub const State = struct {
 
         var filtered = blk: {
             var filtered = try ArrayList(Candidate).initCapacity(state.allocator, candidates.len);
-            for (candidates) |candidate| {
-                filtered.appendAssumeCapacity(.{ .str = candidate });
+            for (candidates) |c| {
+                filtered.appendAssumeCapacity(.{ .str = c });
             }
             break :blk try filtered.toOwnedSlice();
         };
@@ -202,7 +181,7 @@ pub const State = struct {
                 tokens = splitQuery(tokens_buf, state.query.slice());
                 state.case_sensitive = hasUpper(state.query.slice());
 
-                filtered = filter.rankCandidates(filtered_buf, candidates, tokens, state.config.keep_order, state.config.plain, state.case_sensitive);
+                filtered = candidate.rank(filtered_buf, candidates, tokens, state.config.keep_order, state.config.plain, state.case_sensitive);
                 state.selected = 0;
                 state.offset = 0;
                 state.selected_rows.clear();
@@ -335,7 +314,7 @@ pub const State = struct {
             if (line < candidates.len) state.drawCandidate(
                 items,
                 line + 1,
-                candidates[line + state.offset],
+                candidates[line + state.offset].str,
                 tokens,
                 state.selected_rows.contains(line + state.offset),
                 line == state.selected,
@@ -394,21 +373,20 @@ pub const State = struct {
         state: *State,
         win: vaxis.Window,
         line: usize,
-        candidate: Candidate,
+        str: []const u8,
         tokens: [][]const u8,
         selected: bool,
         highlight: bool,
     ) void {
         var matches_buf: [2048]usize = undefined;
-        const filename = if (state.config.plain) null else std.fs.path.basename(candidate.str);
-        const matches = calculateHighlights(candidate.str, filename, tokens, state.case_sensitive, state.config.plain, &matches_buf);
+        const matches = zf.highlight(str, tokens, state.case_sensitive, state.config.plain, &matches_buf);
 
         // no highlights, just output the string
         if (matches.len == 0) {
             _ = try win.print(&.{
                 .{ .text = if (selected) "* " else "  " },
                 .{
-                    .text = candidate.str,
+                    .text = str,
                     .style = .{ .reverse = highlight },
                 },
             }, .{
@@ -417,7 +395,7 @@ pub const State = struct {
                 .wrap = .none,
             });
         } else {
-            var slicer = HighlightSlicer.init(candidate.str, matches);
+            var slicer = HighlightSlicer.init(str, matches);
 
             var res = try win.printSegment(.{
                 .text = if (selected) "* " else "  ",

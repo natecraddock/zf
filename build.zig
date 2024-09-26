@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Expose zf as a Zig module
-    _ = b.addModule("zf", .{
+    const zf_module = b.addModule("zf", .{
         .root_source_file = b.path("src/zf/zf.zig"),
     });
 
@@ -21,6 +21,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    tui.root_module.addImport("zf", zf_module);
     tui.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
 
     b.installArtifact(tui);
@@ -37,18 +38,19 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    tui_tests.root_module.addImport("zf", zf_module);
     tui_tests.root_module.addImport("vaxis", dep_vaxis.module("vaxis"));
 
-    // const lib_tests = b.addTest(.{
-    //     .root_source_file = b.path("src/zf/zf.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
+    const lib_tests = b.addTest(.{
+        .root_source_file = b.path("src/zf/zf.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const run_tui_tests = b.addRunArtifact(tui_tests);
-    // const run_lib_tests = b.addRunArtifact(lib_tests);
+    const run_lib_tests = b.addRunArtifact(lib_tests);
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_tui_tests.step);
-    // test_step.dependOn(&run_lib_tests.step);
+    test_step.dependOn(&run_lib_tests.step);
 }
