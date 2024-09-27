@@ -379,7 +379,7 @@ pub const State = struct {
         highlight: bool,
     ) void {
         var matches_buf: [2048]usize = undefined;
-        const matches = zf.highlight(str, tokens, &matches_buf, .{ .case_sensitive = state.case_sensitive, .plain = state.config.plain });
+        const matches = zf.highlight(str, tokens, &matches_buf, .{ .to_lower = !state.case_sensitive, .plain = state.config.plain });
 
         // no highlights, just output the string
         if (matches.len == 0) {

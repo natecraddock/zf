@@ -12,7 +12,10 @@ test {
 }
 
 pub const RankOptions = struct {
-    case_sensitive: bool = false,
+    /// Converts the string to lowercase while ranking if set to true. Does not convert the tokens to lowercase.
+    to_lower: bool = true,
+
+    /// If true, the zf filepath algorithms are disabled (useful for matching arbitrary strings)
     plain: bool = false,
 };
 
@@ -29,7 +32,7 @@ pub fn rank(
     var sum: f64 = 0;
     for (tokens) |token| {
         const strict_path = !opts.plain and filter.hasSeparator(token);
-        if (rankToken(str, token, .{ .filename = filename, .case_sensitive = opts.case_sensitive, .strict_path = strict_path })) |r| {
+        if (filter.rankToken(str, filename, token, !opts.to_lower, strict_path)) |r| {
             sum += r;
         } else return null;
     }
@@ -39,8 +42,13 @@ pub fn rank(
 }
 
 pub const RankTokenOptions = struct {
-    case_sensitive: bool = false,
+    /// Converts the string to lowercase while ranking if set to true. Does not convert the token to lowercase.
+    to_lower: bool = false,
+
+    /// Set to true when the token has path separators in it
     strict_path: bool = false,
+
+    /// Set to the filename (basename) of the string for filepath matching
     filename: ?[]const u8 = null,
 };
 
@@ -50,21 +58,21 @@ pub fn rankToken(
     token: []const u8,
     opts: RankTokenOptions,
 ) ?f64 {
-    return filter.rankToken(str, opts.filename, token, opts.case_sensitive, opts.strict_path);
+    return filter.rankToken(str, opts.filename, token, !opts.to_lower, opts.strict_path);
 }
 
 test "rank library interface" {
     try testing.expect(rank("abcdefg", &.{ "a", "z" }, .{}) == null);
     try testing.expect(rank("abcdefg", &.{ "a", "b" }, .{}) != null);
-    try testing.expect(rank("abcdefg", &.{ "a", "B" }, .{ .case_sensitive = true }) == null);
-    try testing.expect(rank("aBcdefg", &.{ "a", "B" }, .{ .case_sensitive = true }) != null);
+    try testing.expect(rank("abcdefg", &.{ "a", "B" }, .{ .to_lower = false }) == null);
+    try testing.expect(rank("aBcdefg", &.{ "a", "B" }, .{ .to_lower = false }) != null);
     try testing.expect(rank("a/path/to/file", &.{"zig"}, .{}) == null);
     try testing.expect(rank("a/path/to/file", &.{ "path", "file" }, .{}) != null);
 
     try testing.expect(rankToken("abcdefg", "a", .{}) != null);
     try testing.expect(rankToken("abcdefg", "z", .{}) == null);
-    try testing.expect(rankToken("abcdefG", "G", .{ .case_sensitive = true }) != null);
-    try testing.expect(rankToken("abcdefg", "A", .{ .case_sensitive = true }) == null);
+    try testing.expect(rankToken("abcdefG", "G", .{ .to_lower = false }) != null);
+    try testing.expect(rankToken("abcdefg", "A", .{ .to_lower = false }) == null);
     try testing.expect(rankToken("a/path/to/file", "file", .{ .filename = "file" }) != null);
     try testing.expect(rankToken("a/path/to/file", "zig", .{ .filename = "file" }) == null);
 
@@ -92,7 +100,7 @@ pub fn highlight(
     var index: usize = 0;
     for (tokens) |token| {
         const strict_path = !opts.plain and filter.hasSeparator(token);
-        const matched = filter.highlightToken(str, filename, token, opts.case_sensitive, strict_path, matches[index..]);
+        const matched = filter.highlightToken(str, filename, token, !opts.to_lower, strict_path, matches[index..]);
         index += matched.len;
     }
 
@@ -106,19 +114,19 @@ pub fn highlightToken(
     matches: []usize,
     opts: RankTokenOptions,
 ) []const usize {
-    return filter.highlightToken(str, opts.filename, token, opts.case_sensitive, opts.strict_path, matches);
+    return filter.highlightToken(str, opts.filename, token, !opts.to_lower, opts.strict_path, matches);
 }
 
 test "highlight library interface" {
     var matches_buf: [128]usize = undefined;
 
     try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdef", &.{ "a", "f" }, &matches_buf, .{}));
-    try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdeF", &.{ "a", "F" }, &matches_buf, .{ .case_sensitive = true }));
+    try testing.expectEqualSlices(usize, &.{ 0, 5 }, highlight("abcdeF", &.{ "a", "F" }, &matches_buf, .{ .to_lower = false }));
     try testing.expectEqualSlices(usize, &.{ 2, 3, 4, 5, 10, 11, 12, 13 }, highlight("a/path/to/file", &.{ "path", "file" }, &matches_buf, .{}));
     try testing.expectEqualSlices(usize, &.{ 4, 5, 6, 7, 8, 9, 10 }, highlight("lib/ziglyph/zig.mod", &.{"ziglyph"}, &matches_buf, .{}));
 
     try testing.expectEqualSlices(usize, &.{0}, highlightToken("abcdef", "a", &matches_buf, .{}));
-    try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", "F", &matches_buf, .{ .case_sensitive = true }));
+    try testing.expectEqualSlices(usize, &.{5}, highlightToken("abcdeF", "F", &matches_buf, .{ .to_lower = false }));
     try testing.expectEqualSlices(usize, &.{ 10, 11, 12, 13 }, highlightToken("a/path/to/file", "file", &matches_buf, .{ .filename = "file" }));
 
     // highlights with basename trailing slashes

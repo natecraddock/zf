@@ -1,19 +1,53 @@
 # Using zf as a library
 
-zf is offered as both a Zig package and a C library. The library is allocation free and expects the caller to handle any required allocations.
+zf is offered as both a Zig module and a C library. zf is allocation free and expects the caller to handle any required allocations.
+
+To add to your project run
+
+```
+zig fetch --save git+https://github.com/natecraddock/zf
+```
+
+Then in your build.zig file you can use the dependency.
+
+```zig
+pub fn build(b: *std.Build) void {
+    // ... snip ...
+
+    const ziglua = b.dependency("zf", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // ... snip ...
+
+    // add the zf module
+    exe.root_module.addImport("zf", ziglua.module("zf"));
+
+}
+```
+
+In your code zf will be available with `@import("zf")`
+
+See [the source](https://github.com/natecraddock/zf/blob/master/src/zf/zf.zig) for documentation on each function.
 
 ## Usage details
-There are a few things that zf expects you to follow when using it as a library. Pay special attention to the `case_sensitive` parameter.
+**There are a few things that zf expects you to follow when using it as a library. Pay special attention to the `to_lower` parameter.**
+
+The zf API is designed to offer maximum performance. This means the API leaves some decisions to the caller like allocation and tokenizing the input query.
 
 ### Function types
-The Zig and C APIs are nearly identical. The Zig API takes advantage of Zig's ability to return nullable values and accept slices but otherwise they are the same.
 
-The library offers both high and low level interfaces to zf's ranking algorithm. The high level interfaces (`rank()` and `highlight()`) rank a string against a list of query tokens. The low level functions (`rankToken()` and `highlightToken()`) require more work on the caller's part, but are more flexible.
+The library offers functions two types of functions. One that ranks a slice of tokens, and one that ranks a single token:
+* `rank()` and `highlight()` rank and highlight a string against a slice of query tokens.
+* `rankToken()` and `highlightToken()` operate on a single token
 
 ### Case sensitivity
-`case_sensitive` is an argument in all library ranking functions. When `case_sensitive` is false, the tokens **will not be converted to lowercase**. This is for efficiency reasons. zf assumes the caller knows when case sensitivity will be enabled, and expects the caller to ensure any tokens are fully lowercase when `case_sensitive` is false. When `case_sensitive` is true, nothing needs to be done.
+`to_lower` is an argument in all library ranking functions. When `to_lower` is true, the string is converted to lowercase, but **the tokens are not converted to lowercase**. This is for efficiency reasons. The tokens are known before ranking a list of strings and should be converted to lowercase ahead of time if case insensitive matching is desired.
 
-More concretely, calling `rankToken("my/Path/here", "Path", false, false)` (case sensitive is false) will NOT match. The string `"my/Path/here"` will be converted to lowercase, but the token will remain as `"Path"`.
+zf assumes the caller knows when case sensitivity will be enabled, and expects the caller to ensure any tokens are fully lowercase when `to_lower` is true. When `to_lower` is true, nothing needs to be done.
+
+More concretely, calling `rankToken("my/Path/here", "Path", .{})` (case sensitive is false by default) will NOT match. The string `"my/Path/here"` will be converted to lowercase, but the token will remain as `"Path"`.
 
 ### Plaintext matching
 The high-level `rank()` and `highlight()` functions accept a boolean `plain` parameter. When true filename computations are bypassed.
@@ -36,14 +70,12 @@ Using zf as a Zig package is straightforward. Download or clone this repo and pl
 ```zig
 const zf = @import("lib/zf/build.zig");
 
-pub fn build(b: *std.build.Builder) void {
-    ...
-    exe.addPackage(zf.package);
 }
 ```
 
-See [the library file](https://github.com/natecraddock/zf/blob/master/src/lib.zig) for documentation on each function.
+Look at the zf TUI source code for more examples on how to use the module.
 
 ## C
 
-Todo
+See the source code of [telescipe-zf-native.nvim](https://github.com/natecraddock/telescope-zf-native.nvim) for a good example of
+using zf ranking from C.
