@@ -63,13 +63,45 @@ Range highlighting is provided as a separate function and not done in the rankin
 
 This also makes ranking more performant for callers who do not need range highlight information.
 
-## Zig
-
-Using zf as a Zig package is straightforward. Download or clone this repo and place in a subdirectory of your project. Assuming zf is placed in a `./lib/zf` directory, use the following to import and compile zf with your Zig project.
+## Example
 
 ```zig
-const zf = @import("lib/zf/build.zig");
+const std = @import("std");
 
+const zf = @import("zf");
+
+pub fn main() void {
+    // Strings we want to rank
+    const strings = [_][]const u8{
+        "src/tui/EditBuffer.zig",
+        "src/tui/Previewer.zig",
+        "src/tui/array_toggle_set.zig",
+        "src/tui/candidate.zig",
+        "src/tui/main.zig",
+        "src/tui/opts.zig",
+        "src/tui/ui.zig",
+        "src/zf/clib.zig",
+        "src/zf/filter.zig",
+        "src/zf/zf.zig",
+    };
+
+    // Ranking based on a single token
+    const query = "tui";
+    for (strings) |str| {
+        const rank = zf.rankToken(str, query, .{});
+        std.debug.print("str: {s} rank: {?}\n", .{ str, rank });
+    }
+
+    std.debug.print("\n", .{});
+
+    // Ranking based on multiple tokens
+    const query_tokens = [_][]const u8{ "tui", "Pr" };
+    for (strings) |str| {
+        // Setting to_lower to false because the query tokens are attempting
+        // to match with case sensitivity ("Pr")
+        const rank = zf.rank(str, &query_tokens, .{ .to_lower = false });
+        std.debug.print("str: {s} rank: {?}\n", .{ str, rank });
+    }
 }
 ```
 
