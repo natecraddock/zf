@@ -9,7 +9,7 @@ zf is a fuzzy finder that excels at filtering filepaths:
 
 The goal of zf is to be more accurate than other fuzzy finders when filtering filepaths, but it also functions as a general-purpose fuzzy finder.
 
-zf is also available as an allocation-free library for fuzzy filtering. [See the docs for more info](https://github.com/natecraddock/zf/blob/master/doc/lib.md).
+zf is also available as an allocation-free library for fuzzy filtering. [See the docs for more info](https://github.com/natecraddock/zf/blob/main/doc/lib.md).
 
 [Try zf online!](https://nathancraddock.com/zf-playground/)
 
@@ -28,8 +28,8 @@ https://user-images.githubusercontent.com/7967463/225198950-a6ab568f-644f-40a1-b
 
 ## Docs
 
-* [Usage Documentation](https://github.com/natecraddock/zf/blob/master/doc/zf.md)
-* [Library Documentation](https://github.com/natecraddock/zf/blob/master/doc/lib.md)
+* [Usage Documentation](https://github.com/natecraddock/zf/blob/main/doc/zf.md)
+* [Library Documentation](https://github.com/natecraddock/zf/blob/main/doc/lib.md)
 
 ## Why use zf?
 
@@ -134,7 +134,7 @@ Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries 
 
 ### Building from source
 
-For compatibility with system package managers, zf targets the latest stable release of Zig. The [`unstable`](https://github.com/natecraddock/zf/tree/unstable) branch is kept up to date with Zig master.
+For compatibility with system package managers, zf targets the latest stable release of Zig.
 
 ```
 git clone https://github.com/natecraddock/zf
