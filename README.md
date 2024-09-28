@@ -7,11 +7,11 @@ zf is a fuzzy finder that excels at filtering filepaths:
 * [because filenames are usually unique](https://nathancraddock.com/blog/in-search-of-a-better-finder/#data-collection), matches on filenames are prioritized
 * when the query resembles a file path, zf [uses heuristics for a more accurate match](#strict-path-matching)
 
-While it also functions as a general-purpose fuzzy finder, the goal of zf is to be more accurate than other fuzzy finders when filtering filepaths. If you find something that could be improved, please [let me know](https://github.com/natecraddock/zf/issues).
+The goal of zf is to be more accurate than other fuzzy finders when filtering filepaths, but it also functions as a general-purpose fuzzy finder.
 
-zf is also available as an allocation-free library for fuzzy filtering.
+zf is also available as an allocation-free library for fuzzy filtering. [See the docs for more info](https://github.com/natecraddock/zf/blob/master/doc/lib.md).
 
-[Try it online!](https://nathancraddock.com/zf-playground/)
+[Try zf online!](https://nathancraddock.com/zf-playground/)
 
 ## Demo
 
@@ -19,16 +19,12 @@ https://user-images.githubusercontent.com/7967463/225198950-a6ab568f-644f-40a1-b
 
 ## Features
 
-* designed for fuzzy matching file paths (but also works as a general purpose fuzzy finder)
+* fuzzy matching algorithm designed for file paths
 * refine search results with whitespace separated query terms
-* case insensitive unless the query contains uppercase letters (smartcase)
+* smartcase (case insensitive unless the query contains uppercase letters)
 * multiselect to output multiple selected lines
+* preview window
 * Zig and C libraries for the zf ranking algorithm
-
-zf aims to be simple:
-* no full-window interface
-* minimal config and options
-* sensible defaults
 
 ## Docs
 
