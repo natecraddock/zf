@@ -8,5 +8,10 @@
             .hash = "1220523a3a301cbfbd83a374e2a69073fa14b211f2f6aaa4fc9497c936feaa67f738",
         },
     },
-    .paths = .{""},
+    .paths = .{
+        "src/zf",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+    },
 }
