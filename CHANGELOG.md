@@ -1,4 +1,60 @@
-# master
+# 0.10.0
+
+This release adds support for an fzf-like `--preview` option, rewrites the UI to use
+[libvaxis](https://github.com/rockorager/libvaxis/), and updates the Zig module API.
+
+## Preview
+
+The `--preview` option can be used to run a command for the currently selected line. The stdout of the command
+is collected and displayed in a preview window on the right. `{}` characters in the command will be substituted with the current line.
+
+The `--preview-width` option can be used to set the width of the preview window as a percent. Values from 20% to 80% are accepted, with or without the percent sign.
+
+As an example
+
+```
+fd -tf | zf --preview 'cat {}'
+```
+
+will pipe a list of files to `zf` and use `cat` to display the contents of the currently selected file on the right of the window.
+
+## Zig Module API
+
+Zf can be used as a [Zig module](https://github.com/natecraddock/zf/blob/main/doc/lib.md) to add fuzzy matching
+to your project. The API was simplified in this release.
+
+Rather than accept boolean parameters, the options are now in a struct passed to the function.
+
+This means
+
+```zig
+zf.rank(string, token, false, false);
+zf.rank(string, token, false, true);
+```
+
+Is now written as
+
+```zig
+zf.rank(string, token, .{});
+zf.rank(string, token, .{ .plain = true });
+```
+
+This makes the default case simpler, and also makes the boolean parameters clear at the call site.
+
+The `case_sensitive` parameter was also named to `to_lower` for more clarity. See [the library docs](https://github.com/natecraddock/zf/blob/main/doc/lib.md) for more information.
+
+## Other Changes
+
+* The UI was completely rewritten to use [libvaxis](https://github.com/rockorager/libvaxis/) instead of my own
+  custom terminal rendering code.
+
+* The env variable `ZF_PROMPT` no longer supports terminal escape sequences. It was difficult to support this
+  when rewriting to use libvaxis. Support for this feature may return in the future if there is interest.
+
+* Adds an option to `zig build` to compile as a PIE executable. This should be useful for package
+  mainainers. Use `zig build -Dpie` to enable this option
+
+* Zf no longer does unicode normalization of the input.
 
 # 0.9.2
 
