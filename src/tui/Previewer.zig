@@ -59,11 +59,6 @@ fn threadLoop(previewer: *Previewer, loop: *vaxis.Loop(Event)) !void {
     while (true) {
         previewer.semaphore.wait();
 
-        // If the arg is already being previewed we don't need to do any work
-        if (mem.eql(u8, previewer.arg, previewer.last_arg)) {
-            continue;
-        }
-
         const command = try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ previewer.cmd_parts[0], previewer.arg, previewer.cmd_parts[1] });
 
         var child = Child.init(&.{ previewer.shell, "-c", command }, allocator);
@@ -99,7 +94,6 @@ fn threadLoop(previewer: *Previewer, loop: *vaxis.Loop(Event)) !void {
             previewer.output = "Invalid utf8";
         }
 
-        previewer.last_arg = try allocator.dupe(u8, previewer.arg);
         loop.postEvent(.preview_ready);
     }
 }
