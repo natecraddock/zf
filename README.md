@@ -114,6 +114,14 @@ To end strict path matching, just add a space to start a new query token.
 
 An [AUR package](https://aur.archlinux.org/packages/zf/) is available.
 
+### Void Linux
+
+Install from official repository
+
+```
+sudo xbps-install zf
+```
+
 ### macOS
 
 Install with Homebrew
