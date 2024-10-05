@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) void {
     const ziglua = b.dependency("zf", .{
         .target = target,
         .optimize = optimize,
+        .with_tui = false,
     });
 
     // ... snip ...
