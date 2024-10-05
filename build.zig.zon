@@ -6,6 +6,7 @@
         .vaxis = .{
             .url = "git+https://github.com/rockorager/libvaxis?ref=v0.4.1#f0eaa3c831f6376e7fa0519c275cdcb764580e12",
             .hash = "1220523a3a301cbfbd83a374e2a69073fa14b211f2f6aaa4fc9497c936feaa67f738",
+            .lazy = true,
         },
     },
     .paths = .{
