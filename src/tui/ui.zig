@@ -253,9 +253,9 @@ pub const State = struct {
                     state.query.moveCursor(1, .right);
                 } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
                     state.query.moveCursor(1, .left);
-                } else if (key.matches(Key.down, .{}) or key.matches('p', .{ .ctrl = true }) or key.matches('n', .{ .ctrl = true })) {
+                } else if (key.matches(Key.down, .{}) or key.matches('n', .{ .ctrl = true })) {
                     lineDown(state, visible_rows, num_filtered - visible_rows);
-                } else if (key.matches(Key.up, .{})) {
+                } else if (key.matches(Key.up, .{}) or key.matches('p', .{ .ctrl = true })) {
                     lineUp(state);
                 } else if (key.matches('k', .{ .ctrl = true })) {
                     if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.query.len());
