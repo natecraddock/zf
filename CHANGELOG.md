@@ -1,3 +1,11 @@
+# 0.10.1
+
+A small bugfix release to fix the keybindings so that <kbd>ctrl-p</kbd> moves the selection up.
+
+Additionally:
+* adds libVaxis as a lazyDependency
+* adds Void Linux install instruction
+
 # 0.10.0
 
 This release adds support for an fzf-like `--preview` option, rewrites the UI to use
