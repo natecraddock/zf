@@ -1,7 +1,7 @@
 .{
     .name = "zf",
     .description = "a commandline fuzzy finder designed for filtering filepaths",
-    .version = "0.10.1",
+    .version = "0.10.2",
     .dependencies = .{
         .vaxis = .{
             .url = "https://github.com/rockorager/libvaxis/archive/refs/tags/v0.5.1.tar.gz",
