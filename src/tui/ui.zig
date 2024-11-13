@@ -298,18 +298,18 @@ pub const State = struct {
         win.clear();
 
         const width = state.vx.screen.width;
-        const preview_width: usize = if (state.preview) |_|
+        const preview_width: u16 = if (state.preview) |_|
             @intFromFloat(@as(f64, @floatFromInt(width)) * state.config.preview_width)
         else
             0;
 
         const items_width = width - preview_width;
-        const items = win.child(.{ .height = .{ .limit = state.config.height }, .width = .{ .limit = items_width } });
+        const items = win.child(.{ .height = state.config.height, .width = items_width });
 
         const height = @min(state.vx.screen.height, state.config.height);
 
         // draw the candidates
-        var line: usize = 0;
+        var line: u16 = 0;
         while (line < height - 1) : (line += 1) {
             if (line < candidates.len) state.drawCandidate(
                 items,
@@ -328,18 +328,18 @@ pub const State = struct {
             if (num_selected > 0) {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{} [{}]", .{ candidates.len, total_candidates, num_selected });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + numDigits(num_selected) + 4;
-                _ = try items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
+                _ = items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
             } else {
                 const stats = try std.fmt.bufPrint(&buf, "{}/{}", .{ candidates.len, total_candidates });
                 const stats_width = numDigits(candidates.len) + numDigits(total_candidates) + 1;
-                _ = try items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
+                _ = items.printSegment(.{ .text = stats }, .{ .col_offset = items_width - stats_width, .row_offset = 0 });
             }
         }
 
         // draw the prompt
         // TODO: handle display of queries longer than the screen width
         // const query_width = state.query.slice().len;
-        _ = try items.print(&.{
+        _ = items.print(&.{
             .{ .text = state.config.prompt },
             .{ .text = state.query.slice() },
         }, .{ .col_offset = 0, .row_offset = 0 });
@@ -349,15 +349,16 @@ pub const State = struct {
             const preview_win = win.child(.{
                 .x_off = items_width,
                 .y_off = 0,
-                .height = .{ .limit = state.config.height },
-                .width = .{ .limit = preview_width },
+                .height = state.config.height,
+                .width = preview_width,
                 .border = .{ .where = .left },
             });
 
             var lines = std.mem.splitScalar(u8, preview.output, '\n');
-            for (0..height) |l| {
+            for (0..height) |captured_l| {
+                const l: u16 = @intCast(captured_l);
                 if (lines.next()) |preview_line| {
-                    _ = try preview_win.printSegment(
+                    _ = preview_win.printSegment(
                         .{ .text = preview_line },
                         .{ .row_offset = l, .wrap = .none },
                     );
@@ -365,14 +366,15 @@ pub const State = struct {
             }
         }
 
-        items.showCursor(state.config.prompt.len + state.query.cursor, 0);
+        const config_prompt_len: u16 = @intCast(state.config.prompt.len);
+        items.showCursor(config_prompt_len + state.query.cursor, 0);
         try state.vx.render(state.tty.anyWriter());
     }
 
     fn drawCandidate(
         state: *State,
         win: vaxis.Window,
-        line: usize,
+        line: u16,
         str: []const u8,
         tokens: [][]const u8,
         selected: bool,
@@ -383,7 +385,7 @@ pub const State = struct {
 
         // no highlights, just output the string
         if (matches.len == 0) {
-            _ = try win.print(&.{
+            _ = win.print(&.{
                 .{ .text = if (selected) "* " else "  " },
                 .{
                     .text = str,
@@ -397,7 +399,7 @@ pub const State = struct {
         } else {
             var slicer = HighlightSlicer.init(str, matches);
 
-            var res = try win.printSegment(.{
+            var res = win.printSegment(.{
                 .text = if (selected) "* " else "  ",
             }, .{
                 .row_offset = line,
@@ -413,7 +415,7 @@ pub const State = struct {
                     } else .default,
                 };
 
-                res = try win.printSegment(.{
+                res = win.printSegment(.{
                     .text = slice.str,
                     .style = highlight_style,
                 }, .{

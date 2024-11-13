@@ -10,7 +10,7 @@ const ArrayList = std.ArrayList;
 const EditBuffer = @This();
 
 buffer: ArrayList(u8),
-cursor: usize,
+cursor: u16,
 dirty: bool,
 
 pub fn init(allocator: Allocator) EditBuffer {
@@ -25,8 +25,8 @@ pub fn deinit(eb: *EditBuffer) void {
     eb.buffer.deinit();
 }
 
-pub fn len(eb: *const EditBuffer) usize {
-    return eb.buffer.items.len;
+pub fn len(eb: *const EditBuffer) u16 {
+    return @intCast(eb.buffer.items.len);
 }
 
 pub fn slice(eb: *EditBuffer) []const u8 {
@@ -36,7 +36,8 @@ pub fn slice(eb: *EditBuffer) []const u8 {
 /// Insert utf-8 encoded text into the buffer at the cursor position
 pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
     try eb.buffer.insertSlice(eb.cursor, bytes);
-    eb.cursor += bytes.len;
+    const bytes_len: u16 = @intCast(bytes.len);
+    eb.cursor += bytes_len;
     eb.dirty = true;
 }
 
@@ -64,12 +65,12 @@ pub fn deleteTo(eb: *EditBuffer, pos: usize) void {
 }
 
 /// Set the cursor to an absolute position
-pub fn setCursor(eb: *EditBuffer, pos: usize) void {
+pub fn setCursor(eb: *EditBuffer, pos: u16) void {
     eb.cursor = if (pos > eb.len()) eb.len() else pos;
 }
 
 /// Move the cursor relative to it's current position
-pub fn moveCursor(eb: *EditBuffer, amount: usize, direction: Direction) void {
+pub fn moveCursor(eb: *EditBuffer, amount: u16, direction: Direction) void {
     eb.cursor = switch (direction) {
         .left => if (amount >= eb.cursor) 0 else eb.cursor - amount,
         .right => if (eb.cursor + amount > eb.len()) eb.len() else eb.cursor + amount,
