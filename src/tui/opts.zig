@@ -94,7 +94,7 @@ const OptionIter = struct {
 pub const Config = struct {
     // Commandline options
     keep_order: bool = false,
-    height: usize = 10,
+    height: u16 = 10,
     filter: ?[]const u8 = null,
     plain: bool = false,
     delimiter: []const u8 = "\n",
@@ -144,7 +144,7 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
         // height
         else if (mem.eql(u8, opt, "height") or mem.eql(u8, opt, "l") or mem.eql(u8, opt, "lines")) {
             const height_str = iter.getArg() orelse missingArg(stderr, iter, opt);
-            const height = fmt.parseUnsigned(usize, height_str, 10) catch argError(stderr, "height must be an integer");
+            const height = fmt.parseUnsigned(u16, height_str, 10) catch argError(stderr, "height must be an integer");
             if (height < 2) argError(stderr, "height must be an integer greater than 1");
             config.height = height;
         }
