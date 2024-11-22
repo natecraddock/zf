@@ -430,6 +430,8 @@ pub const State = struct {
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
 fn deleteWord(query: *EditBuffer) void {
+    if (query.cursor == 0) return;
+
     var slice = query.slice()[0..query.cursor];
     var end = slice.len - 1;
 
