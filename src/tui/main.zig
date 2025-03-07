@@ -11,7 +11,7 @@ const ArrayList = std.ArrayList;
 const Candidate = candidate.Candidate;
 const Color = ui.Color;
 
-pub const std_options = .{
+pub const std_options: std.Options = .{
     .log_level = .err,
 };
 

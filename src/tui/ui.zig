@@ -75,7 +75,7 @@ fn numDigits(number: usize) u16 {
 /// split the query on spaces and return a slice of query tokens
 pub fn splitQuery(query_tokens: [][]const u8, query: []const u8) [][]const u8 {
     var index: u8 = 0;
-    var it = std.mem.tokenize(u8, query, " ");
+    var it = std.mem.tokenizeScalar(u8, query, ' ');
     while (it.next()) |token| : (index += 1) {
         if (index == query_tokens.len) break;
         query_tokens[index] = token;
