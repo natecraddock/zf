@@ -136,6 +136,12 @@ brew install zf
 nix-env --install zf
 ```
 
+### Nix Flakes
+
+```
+nix profile install nixpkgs#zf
+```
+
 ### Binaries
 
 Each [release](https://github.com/natecraddock/zf/releases/latest) has binaries attached for macOS and Linux.
