@@ -2,25 +2,26 @@ name: tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        version: [master]
     runs-on: ${{matrix.os}}
 
     steps:
-    - name: Clone zf
-      uses: actions/checkout@v3
+      - name: Clone zf
+        uses: actions/checkout@v3
 
-    - name: Setup Zig
-      uses: mlugg/setup-zig@v1
-      with:
-        version: 0.14.0
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: ${{matrix.version}}
 
-    - name: Run tests
-      run: zig build test
+      - name: Run tests
+        run: zig build test

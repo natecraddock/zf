@@ -5,8 +5,8 @@
     .version = "0.10.3",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis#1f41c121e8fc153d9ce8c6eb64b2bbab68ad7d23",
-            .hash = "vaxis-0.1.0-BWNV_FUICQAFZnTCL11TUvnUr1Y0_ZdqtXHhd51d76Rn",
+            .url = "https://github.com/rockorager/libvaxis/archive/1bf887aa7e3736bad69fd4e277a378946edb0f2a.tar.gz",
+            .hash = "vaxis-0.5.1-BWNV_H0PCQAeMusmtLzh9P9xO2IW242GZ2IRe9iKYhcA",
             .lazy = true,
         },
     },
