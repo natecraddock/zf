@@ -12,7 +12,7 @@ pub const Candidate = struct {
 
 /// read the candidates from the buffer
 pub fn collect(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![][]const u8 {
-    var candidates = ArrayList([]const u8).init(allocator);
+    var candidates: ArrayList([]const u8) = .empty;
 
     // find delimiters
     var start: usize = 0;
@@ -20,7 +20,7 @@ pub fn collect(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]
         if (char == delimiter) {
             // add to arraylist only if slice is not all delimiters
             if (index - start != 0) {
-                try candidates.append(buf[start..index]);
+                try candidates.append(allocator, buf[start..index]);
             }
             start = index + 1;
         }
@@ -28,10 +28,10 @@ pub fn collect(allocator: std.mem.Allocator, buf: []const u8, delimiter: u8) ![]
 
     // catch the end if stdio didn't end in a delimiter
     if (start < buf.len and buf[start] != delimiter) {
-        try candidates.append(buf[start..]);
+        try candidates.append(allocator, buf[start..]);
     }
 
-    return candidates.toOwnedSlice();
+    return try candidates.toOwnedSlice(allocator);
 }
 
 test "collect whitespace" {

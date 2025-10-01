@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const pie = b.option(bool, "pie", "Build a Position Independent Executable");
-    const with_tui = b.option(bool, "with_tui", "Build TUI") orelse false;
+    const with_tui = b.option(bool, "with_tui", "Build TUI") orelse true;
 
     // Expose zf as a Zig module
     const zf_module = b.addModule("zf", .{
