@@ -13,32 +13,28 @@ pub fn ArrayToggleSet(comptime T: type) type {
 
         const This = @This();
 
-        pub fn init(allocator: Allocator) This {
-            return .{
-                .set = ArrayList(T).init(allocator),
-            };
-        }
+        pub const empty: This = .{ .set = .empty };
 
-        pub fn deinit(as: *This) void {
-            as.set.deinit();
+        pub fn deinit(as: *This, allocator: Allocator) void {
+            as.set.deinit(allocator);
         }
 
         pub fn clear(as: *This) void {
             as.set.clearRetainingCapacity();
         }
 
-        pub fn toggle(as: *This, item: T) !void {
+        pub fn toggle(as: *This, allocator: Allocator, item: T) !void {
             for (as.set.items, 0..) |i, index| {
                 if (item == i) {
                     _ = as.set.orderedRemove(index);
                     return;
                 }
                 if (i > item) {
-                    try as.set.insert(index, item);
+                    try as.set.insert(allocator, index, item);
                     return;
                 }
             }
-            try as.set.append(item);
+            try as.set.append(allocator, item);
         }
 
         pub fn contains(as: This, item: T) bool {
@@ -55,13 +51,13 @@ pub fn ArrayToggleSet(comptime T: type) type {
 }
 
 test "basic ArrayToggleSet" {
-    var items = ArrayToggleSet(u8).init(testing.allocator);
-    defer items.deinit();
+    var items: ArrayToggleSet(u8) = .empty;
+    defer items.deinit(testing.allocator);
 
-    try items.toggle(1);
-    try items.toggle(2);
-    try items.toggle(4);
-    try items.toggle(10);
+    try items.toggle(testing.allocator, 1);
+    try items.toggle(testing.allocator, 2);
+    try items.toggle(testing.allocator, 4);
+    try items.toggle(testing.allocator, 10);
 
     try testing.expect(items.contains(10));
     try testing.expect(!items.contains(100));
@@ -70,33 +66,33 @@ test "basic ArrayToggleSet" {
 }
 
 test "unordered insertion ArrayToggleSet" {
-    var items = ArrayToggleSet(u8).init(testing.allocator);
-    defer items.deinit();
+    var items: ArrayToggleSet(u8) = .empty;
+    defer items.deinit(testing.allocator);
 
-    try items.toggle(10);
-    try items.toggle(1);
-    try items.toggle(4);
-    try items.toggle(2);
+    try items.toggle(testing.allocator, 10);
+    try items.toggle(testing.allocator, 1);
+    try items.toggle(testing.allocator, 4);
+    try items.toggle(testing.allocator, 2);
 
     try testing.expectEqualSlices(u8, &.{ 1, 2, 4, 10 }, items.slice());
 }
 
 test "removal ArrayToggleSet" {
-    var items = ArrayToggleSet(u8).init(testing.allocator);
-    defer items.deinit();
+    var items: ArrayToggleSet(u8) = .empty;
+    defer items.deinit(testing.allocator);
 
-    try items.toggle(10);
-    try items.toggle(1);
-    try items.toggle(4);
-    try items.toggle(2);
+    try items.toggle(testing.allocator, 10);
+    try items.toggle(testing.allocator, 1);
+    try items.toggle(testing.allocator, 4);
+    try items.toggle(testing.allocator, 2);
 
-    try items.toggle(1);
-    try items.toggle(10);
+    try items.toggle(testing.allocator, 1);
+    try items.toggle(testing.allocator, 10);
     try testing.expectEqualSlices(u8, &.{ 2, 4 }, items.slice());
 
-    try items.toggle(1);
-    try items.toggle(100);
-    try items.toggle(3);
+    try items.toggle(testing.allocator, 1);
+    try items.toggle(testing.allocator, 100);
+    try items.toggle(testing.allocator, 3);
     try testing.expectEqualSlices(u8, &.{ 1, 2, 3, 4, 100 }, items.slice());
 
     items.clear();

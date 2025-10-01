@@ -107,7 +107,7 @@ pub const State = struct {
 
     preview: ?Previewer = null,
 
-    pub fn init(allocator: Allocator, config: Config) !State {
+    pub fn init(allocator: Allocator, buf: []u8, config: Config) !State {
         const vx = try vaxis.init(allocator, .{});
 
         const preview = if (config.preview) |cmd| blk: {
@@ -119,12 +119,12 @@ pub const State = struct {
             .config = config,
 
             .vx = vx,
-            .tty = try vaxis.Tty.init(),
+            .tty = try vaxis.Tty.init(buf),
 
             .selected = 0,
-            .selected_rows = ArrayToggleSet(usize).init(allocator),
+            .selected_rows = .empty,
             .offset = 0,
-            .query = EditBuffer.init(allocator),
+            .query = .empty,
 
             .preview = preview,
         };
@@ -133,9 +133,9 @@ pub const State = struct {
     fn deinit(state: *State) void {
         // We must clear the window because we aren't using the alternate screen
         state.vx.window().clear();
-        state.vx.render(state.tty.anyWriter()) catch {};
+        state.vx.render(state.tty.writer()) catch {};
 
-        state.vx.deinit(null, state.tty.anyWriter());
+        state.vx.deinit(null, state.tty.writer());
         state.tty.deinit();
     }
 
@@ -146,11 +146,11 @@ pub const State = struct {
         defer state.deinit();
 
         var filtered = blk: {
-            var filtered = try ArrayList(Candidate).initCapacity(state.allocator, candidates.len);
+            var filtered: ArrayList(Candidate) = try .initCapacity(state.allocator, candidates.len);
             for (candidates) |c| {
                 filtered.appendAssumeCapacity(.{ .str = c });
             }
-            break :blk try filtered.toOwnedSlice();
+            break :blk try filtered.toOwnedSlice(state.allocator);
         };
         const filtered_buf = try state.allocator.alloc(Candidate, candidates.len);
 
@@ -171,7 +171,7 @@ pub const State = struct {
         {
             // Get initial window size
             const ws = try vaxis.Tty.getWinsize(state.tty.fd);
-            try state.vx.resize(state.allocator, state.tty.anyWriter(), ws);
+            try state.vx.resize(state.allocator, state.tty.writer(), ws);
         }
 
         while (true) {
@@ -238,17 +238,17 @@ pub const State = struct {
                 if (key.matches('c', .{ .ctrl = true })) {
                     return .cancel;
                 } else if (key.matches('w', .{ .ctrl = true })) {
-                    if (state.query.len() > 0) deleteWord(&state.query);
+                    if (state.query.len() > 0) deleteWord(state.allocator, &state.query);
                 } else if (key.matches('u', .{ .ctrl = true })) {
-                    state.query.deleteTo(0);
+                    state.query.deleteTo(state.allocator, 0);
                 } else if (key.matches(Key.backspace, .{})) {
-                    state.query.delete(1, .left);
+                    state.query.delete(state.allocator, 1, .left);
                 } else if (key.matches('a', .{ .ctrl = true })) {
                     state.query.setCursor(0);
                 } else if (key.matches('e', .{ .ctrl = true })) {
                     state.query.setCursor(state.query.len());
                 } else if (key.matches('d', .{ .ctrl = true })) {
-                    state.query.delete(1, .right);
+                    state.query.delete(state.allocator, 1, .right);
                 } else if (key.matches('f', .{ .ctrl = true }) or key.matches(Key.right, .{})) {
                     state.query.moveCursor(1, .right);
                 } else if (key.matches('b', .{ .ctrl = true }) or key.matches(Key.left, .{})) {
@@ -258,12 +258,12 @@ pub const State = struct {
                 } else if (key.matches(Key.up, .{}) or key.matches('p', .{ .ctrl = true })) {
                     lineUp(state);
                 } else if (key.matches('k', .{ .ctrl = true })) {
-                    if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.query.len());
+                    if (state.config.vi_mode) lineUp(state) else state.query.deleteTo(state.allocator, state.query.len());
                 } else if (key.matches(Key.tab, .{ .shift = true })) {
-                    try state.selected_rows.toggle(state.selected + state.offset);
+                    try state.selected_rows.toggle(state.allocator, state.selected + state.offset);
                     lineUp(state);
                 } else if (key.matches(Key.tab, .{})) {
-                    try state.selected_rows.toggle(state.selected + state.offset);
+                    try state.selected_rows.toggle(state.allocator, state.selected + state.offset);
                     lineDown(state, visible_rows, num_filtered - visible_rows);
                 } else if (key.matches(Key.enter, .{})) {
                     if (num_filtered == 0) return .none;
@@ -274,10 +274,10 @@ pub const State = struct {
                 } else if (key.matches(Key.escape, .{})) {
                     return .none;
                 } else if (key.text) |text| {
-                    try state.query.insert(text);
+                    try state.query.insert(state.allocator, text);
                 }
             },
-            .winsize => |ws| try state.vx.resize(state.allocator, state.tty.anyWriter(), ws),
+            .winsize => |ws| try state.vx.resize(state.allocator, state.tty.writer(), ws),
             .preview_ready => {
                 // will cause a re-render once the preview output is collected
             },
@@ -368,7 +368,7 @@ pub const State = struct {
 
         const config_prompt_len: u16 = @intCast(state.config.prompt.len);
         items.showCursor(config_prompt_len + state.query.cursor, 0);
-        try state.vx.render(state.tty.anyWriter());
+        try state.vx.render(state.tty.writer());
     }
 
     fn drawCandidate(
@@ -429,7 +429,7 @@ pub const State = struct {
 };
 
 /// Deletes a word to the left of the cursor. Words are separated by space or slash characters
-fn deleteWord(query: *EditBuffer) void {
+fn deleteWord(allocator: Allocator, query: *EditBuffer) void {
     if (query.cursor == 0) return;
 
     var slice = query.slice()[0..query.cursor];
@@ -451,8 +451,8 @@ fn deleteWord(query: *EditBuffer) void {
     }
 
     if (last_index) |index| {
-        query.deleteTo(index + 1);
-    } else query.deleteTo(0);
+        query.deleteTo(allocator, index + 1);
+    } else query.deleteTo(allocator, 0);
 }
 
 fn lineUp(state: *State) void {
