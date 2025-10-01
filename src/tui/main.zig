@@ -25,8 +25,15 @@ pub fn main() anyerror!void {
     var arena = heap.ArenaAllocator.init(heap.page_allocator);
     defer arena.deinit();
 
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    var stdout_buf: [1024]u8 = undefined;
+    var stderr_buf: [1024]u8 = undefined;
+
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buf);
+
+    const stdout = &stdout_writer.interface;
+    const stderr = &stderr_writer.interface;
+
     const allocator = arena.allocator();
 
     const args = try std.process.argsAlloc(allocator);
@@ -34,8 +41,12 @@ pub fn main() anyerror!void {
 
     // read all lines or exit on out of memory
     const buf = blk: {
-        var stdin = io.getStdIn().reader();
-        const buf = try readAll(allocator, &stdin);
+        var stdin_buf: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+        const stdin = &stdin_reader.interface;
+
+        const buf = try stdin.allocRemaining(allocator, .unlimited);
+
         break :blk std.mem.trim(u8, buf, "\n");
     };
 
@@ -53,6 +64,7 @@ pub fn main() anyerror!void {
     const candidates = try candidate.collect(allocator, buf, delimiter);
     if (candidates.len == 0) std.process.exit(1);
 
+    defer stdout.flush() catch unreachable;
     if (config.filter) |query| {
         // Use the heap here rather than an array on the stack. Testing showed that this is actually
         // faster, likely due to locality with other heap-alloced data used in the algorithm.
@@ -88,7 +100,8 @@ pub fn main() anyerror!void {
             config.highlight = if (no_color) null else highlight_color;
         }
 
-        var state = try ui.State.init(allocator, config);
+        var tui_buf: [1024]u8 = undefined;
+        var state = try ui.State.init(allocator, &tui_buf, config);
         const selected = try state.run(candidates);
 
         if (selected) |selected_lines| {

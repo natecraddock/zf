@@ -13,16 +13,14 @@ buffer: ArrayList(u8),
 cursor: u16,
 dirty: bool,
 
-pub fn init(allocator: Allocator) EditBuffer {
-    return .{
-        .buffer = ArrayList(u8).init(allocator),
-        .cursor = 0,
-        .dirty = false,
-    };
-}
+pub const empty: EditBuffer = .{
+    .buffer = .empty,
+    .cursor = 0,
+    .dirty = false,
+};
 
-pub fn deinit(eb: *EditBuffer) void {
-    eb.buffer.deinit();
+pub fn deinit(eb: *EditBuffer, allocator: Allocator) void {
+    eb.buffer.deinit(allocator);
 }
 
 pub fn len(eb: *const EditBuffer) u16 {
@@ -34,8 +32,8 @@ pub fn slice(eb: *EditBuffer) []const u8 {
 }
 
 /// Insert utf-8 encoded text into the buffer at the cursor position
-pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
-    try eb.buffer.insertSlice(eb.cursor, bytes);
+pub fn insert(eb: *EditBuffer, allocator: Allocator, bytes: []const u8) !void {
+    try eb.buffer.insertSlice(allocator, eb.cursor, bytes);
     const bytes_len: u16 = @intCast(bytes.len);
     eb.cursor += bytes_len;
     eb.dirty = true;
@@ -44,20 +42,20 @@ pub fn insert(eb: *EditBuffer, bytes: []const u8) !void {
 const Direction = enum { left, right };
 
 /// Delete in the indicated direction
-pub fn delete(eb: *EditBuffer, count: usize, direction: Direction) void {
+pub fn delete(eb: *EditBuffer, allocator: Allocator, count: usize, direction: Direction) void {
     switch (direction) {
-        .left => eb.deleteTo(eb.cursor -| count),
-        .right => eb.deleteTo(eb.cursor + count),
+        .left => eb.deleteTo(allocator, eb.cursor -| count),
+        .right => eb.deleteTo(allocator, eb.cursor + count),
     }
 }
 
 /// Delete from the cursor to the specified position
-pub fn deleteTo(eb: *EditBuffer, pos: usize) void {
+pub fn deleteTo(eb: *EditBuffer, allocator: Allocator, pos: usize) void {
     const start = @min(eb.cursor, @min(pos, eb.len()));
     const end = @max(eb.cursor, @min(pos, eb.len()));
     if (start == end) return;
 
-    eb.buffer.replaceRange(start, end - start, "") catch unreachable;
+    eb.buffer.replaceRange(allocator, start, end - start, "") catch unreachable;
 
     eb.cursor = start;
 
@@ -87,30 +85,30 @@ pub fn moveCursor(eb: *EditBuffer, amount: u16, direction: Direction) void {
 }
 
 test "EditBuffer insert" {
-    var eb = EditBuffer.init(testing.allocator);
-    defer eb.deinit();
+    var eb: EditBuffer = .empty;
+    defer eb.deinit(testing.allocator);
 
     try testing.expectEqual(0, eb.cursor);
-    try eb.insert("z");
+    try eb.insert(testing.allocator, "z");
     try testing.expectEqualStrings("z", eb.slice());
-    try eb.insert("i");
+    try eb.insert(testing.allocator, "i");
     try testing.expectEqualStrings("zi", eb.slice());
-    try eb.insert("g");
+    try eb.insert(testing.allocator, "g");
     try testing.expectEqualStrings("zig", eb.slice());
 
-    try eb.insert(" ⚡ ");
+    try eb.insert(testing.allocator, " ⚡ ");
     try testing.expectEqualStrings("zig ⚡ ", eb.slice());
-    try eb.insert("¯\\_(ツ)_/¯");
+    try eb.insert(testing.allocator, "¯\\_(ツ)_/¯");
     try testing.expectEqualStrings("zig ⚡ ¯\\_(ツ)_/¯", eb.slice());
-    try eb.insert(" ¾");
+    try eb.insert(testing.allocator, " ¾");
     try testing.expectEqualStrings("zig ⚡ ¯\\_(ツ)_/¯ ¾", eb.slice());
 }
 
 test "EditBuffer set and move cursor" {
-    var eb = EditBuffer.init(testing.allocator);
-    defer eb.deinit();
+    var eb: EditBuffer = .empty;
+    defer eb.deinit(testing.allocator);
 
-    try eb.insert("Ä is for Äpfel 🍎, B is for Bear 🧸");
+    try eb.insert(testing.allocator, "Ä is for Äpfel 🍎, B is for Bear 🧸");
 
     // test clamping
     eb.setCursor(65535);
@@ -119,18 +117,18 @@ test "EditBuffer set and move cursor" {
     try testing.expectEqual(0, eb.cursor);
 
     // insert at the beginning
-    try eb.insert("The Alphabet: ");
+    try eb.insert(testing.allocator, "The Alphabet: ");
     try testing.expectEqualStrings("The Alphabet: Ä is for Äpfel 🍎, B is for Bear 🧸", eb.slice());
 
     // insert at the end
     eb.setCursor(eb.len());
-    try eb.insert(" ...");
+    try eb.insert(testing.allocator, " ...");
     try testing.expectEqualStrings("The Alphabet: Ä is for Äpfel 🍎, B is for Bear 🧸 ...", eb.slice());
 
     // relative movement
     eb.setCursor(0);
     eb.moveCursor(4, .right);
-    try eb.insert("Awesome 💥 ");
+    try eb.insert(testing.allocator, "Awesome 💥 ");
     try testing.expectEqualStrings("The Awesome 💥 Alphabet: Ä is for Äpfel 🍎, B is for Bear 🧸 ...", eb.slice());
 
     // clamping
@@ -141,33 +139,33 @@ test "EditBuffer set and move cursor" {
 }
 
 test "EditBuffer deletion" {
-    var eb = EditBuffer.init(testing.allocator);
-    defer eb.deinit();
+    var eb: EditBuffer = .empty;
+    defer eb.deinit(testing.allocator);
 
-    try eb.insert("Pokémon 😁 → more ascii here");
+    try eb.insert(testing.allocator, "Pokémon 😁 → more ascii here");
 
     // test bounds
     eb.setCursor(0);
-    eb.delete(1, .left);
+    eb.delete(testing.allocator, 1, .left);
     eb.setCursor(eb.len());
-    eb.delete(1, .right);
+    eb.delete(testing.allocator, 1, .right);
     try testing.expectEqualStrings("Pokémon 😁 → more ascii here", eb.slice());
 
     eb.setCursor(0);
-    eb.delete(1, .right);
+    eb.delete(testing.allocator, 1, .right);
     eb.setCursor(eb.len());
-    eb.delete(2, .left);
+    eb.delete(testing.allocator, 2, .left);
     try testing.expectEqualStrings("okémon 😁 → more ascii he", eb.slice());
 
     eb.setCursor(0);
-    eb.deleteTo(7);
+    eb.deleteTo(testing.allocator, 7);
     try testing.expectEqualStrings(" 😁 → more ascii he", eb.slice());
 
     eb.setCursor(10);
-    eb.deleteTo(0);
+    eb.deleteTo(testing.allocator, 0);
     try testing.expectEqualStrings("more ascii he", eb.slice());
 
     eb.setCursor(eb.len());
-    eb.deleteTo(0);
+    eb.deleteTo(testing.allocator, 0);
     try testing.expectEqualStrings("", eb.slice());
 }

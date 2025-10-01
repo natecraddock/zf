@@ -7,7 +7,7 @@ const std = @import("std");
 
 const Allocator = mem.Allocator;
 const Color = @import("ui.zig").Color;
-const File = std.fs.File;
+const Io = std.Io;
 
 const version = "0.10.2";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
@@ -107,7 +107,7 @@ pub const Config = struct {
     highlight: ?Color = .cyan,
 };
 
-pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer) Config {
+pub fn parse(allocator: Allocator, args: []const []const u8, stderr: *Io.Writer) Config {
     var config: Config = .{};
 
     if (args.len == 1) return config;
@@ -117,12 +117,14 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
         // help
         if (mem.eql(u8, opt, "h") or mem.eql(u8, opt, "help")) {
             stderr.print("{s}\n", .{help}) catch unreachable;
+            stderr.flush() catch unreachable;
             process.exit(0);
         }
 
         // version
         else if (mem.eql(u8, opt, "v") or mem.eql(u8, opt, "version")) {
             stderr.print("{s}\n", .{version_str}) catch unreachable;
+            stderr.flush() catch unreachable;
             process.exit(0);
         }
 
@@ -181,6 +183,7 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
         // invalid option
         else {
             stderr.print("zf: unrecognized option '{s}{s}'\n{s}\n", .{ if (iter.short_index != null) "-" else "--", opt, help }) catch unreachable;
+            stderr.flush() catch unreachable;
             process.exit(2);
         }
     }
@@ -188,16 +191,18 @@ pub fn parse(allocator: Allocator, args: []const []const u8, stderr: File.Writer
     return config;
 }
 
-fn missingArg(stderr: File.Writer, iter: OptionIter, opt: []const u8) noreturn {
+fn missingArg(stderr: *Io.Writer, iter: OptionIter, opt: []const u8) noreturn {
     stderr.print(
         "zf: option '{s}{s}' requires an argument\n{s}\n",
         .{ if (iter.short_index != null) "-" else "--", opt, help },
     ) catch unreachable;
+    stderr.flush() catch unreachable;
     process.exit(2);
 }
 
-fn argError(stderr: File.Writer, err: []const u8) noreturn {
+fn argError(stderr: *Io.Writer, err: []const u8) noreturn {
     stderr.print("zf: {s}\n{s}\n", .{ err, help }) catch unreachable;
+    stderr.flush() catch unreachable;
     process.exit(2);
 }
 
