@@ -9,7 +9,7 @@ const Allocator = mem.Allocator;
 const Color = @import("ui.zig").Color;
 const Io = std.Io;
 
-const version = "0.10.2";
+const version = "0.10.3";
 const version_str = std.fmt.comptimePrint("zf {s} Nathan Craddock", .{version});
 
 const help =
