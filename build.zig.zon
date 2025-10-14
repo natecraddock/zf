@@ -3,10 +3,11 @@
     .fingerprint = 0x30d847eef1728438,
     .description = "a commandline fuzzy finder designed for filtering filepaths",
     .version = "0.10.3",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis#6eb16bb4190dc074dafaf4f0ce7dadd50e81192a",
-            .hash = "vaxis-0.5.1-BWNV_BMgCQDXdZzABeY4F_xwgE7nHFtYEP07KgEwJWo8",
+            .url = "https://github.com/rockorager/libvaxis/archive/7dbb9fd3122e4ffad262dd7c151d80d863b68558.tar.gz",
+            .hash = "vaxis-0.5.1-BWNV_LosCQAGmCCNOLljCIw6j6-yt53tji6n6rwJ2BhS",
             .lazy = true,
         },
     },
