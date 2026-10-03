@@ -56,56 +56,11 @@ pub fn startThread(previewer: *Previewer, io: std.Io, loop: *vaxis.Loop(Event)) 
     previewer.thread = try io.concurrent(threadLoop, .{ previewer, io, loop });
 }
 
-// TODO: can this be cleaned up?
-const ThreadLoopError = error{
-    AccessDenied,
-    AntivirusInterference,
-    BadPathName,
-    Canceled,
-    ConcurrencyUnavailable,
-    ConnectionResetByPeer,
-    DeviceBusy,
-    FileBusy,
-    FileLocksUnsupported,
-    FileNotFound,
-    FileSystem,
-    FileTooBig,
-    InputOutput,
-    InvalidBatchScriptArg,
-    InvalidExe,
-    InvalidName,
-    InvalidProcessGroupId,
-    InvalidUserId,
-    InvalidWtf8,
-    IsDir,
-    LockViolation,
-    NameTooLong,
-    NetworkNotFound,
-    NoDevice,
-    NoSpaceLeft,
-    NotDir,
-    NotOpenForReading,
-    OperationUnsupported,
-    OutOfMemory,
-    PathAlreadyExists,
-    PermissionDenied,
-    PipeBusy,
-    ProcessAlreadyExec,
-    ProcessFdQuotaExceeded,
-    ReadOnlyFileSystem,
-    ResourceLimitReached,
-    SocketUnconnected,
-    StreamTooLong,
-    SymLinkLoop,
-    SystemFdQuotaExceeded,
-    SystemResources,
-    Timeout,
-    Unexpected,
-    UnrecognizedVolume,
-    WouldBlock,
-};
+// Vaxis does not return a bounded error set,
+// so type reflection is required here.
+const ThreadLoopError = @typeInfo(@typeInfo(@TypeOf(Previewer.threadLoop)).@"fn".return_type.?).error_union.error_set;
 
-fn threadLoop(previewer: *Previewer, io: std.Io, loop: *vaxis.Loop(Event)) ThreadLoopError!void {
+fn threadLoop(previewer: *Previewer, io: std.Io, loop: *vaxis.Loop(Event)) !void {
     const allocator = previewer.arena.allocator();
 
     while (true) {
